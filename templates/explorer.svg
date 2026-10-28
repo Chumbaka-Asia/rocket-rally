@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 210 297" width="210mm" height="297mm">
+  <rect width="210" height="297" fill="white"/>
+  <g fill="none" stroke="#17172b" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M105 34C73 62 65 113 77 161L44 206 83 197 91 244 105 264 119 244 127 197 166 206 133 161C145 113 137 62 105 34Z"/>
+    <path d="M77 161Q105 177 133 161M83 197Q105 211 127 197M91 244H119"/>
+    <path d="M82 108Q105 84 128 108V139Q105 153 82 139Z"/><circle cx="93" cy="119" r="3"/><circle cx="117" cy="119" r="3"/>
+  </g>
+  <g font-family="Arial, sans-serif" text-anchor="middle" fill="#17172b"><text x="105" y="285" font-size="8" font-weight="bold">STAR EXPLORER</text><text x="105" y="292" font-size="4">Colour every panel, then photograph this page.</text></g>
+</svg>

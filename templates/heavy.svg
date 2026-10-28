@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 210 297" width="210mm" height="297mm">
+  <rect width="210" height="297" fill="white"/>
+  <g fill="none" stroke="#17172b" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M105 27C85 59 84 108 88 169L65 222 82 216 87 256 105 270 123 256 128 216 145 222 122 169C126 108 125 59 105 27Z"/>
+    <path d="M88 169H122M82 216H128M87 256H123M105 48V164"/>
+    <path d="M88 145 72 160M122 145 138 160"/><circle cx="105" cy="91" r="17"/>
+  </g>
+  <g font-family="Arial, sans-serif" text-anchor="middle" fill="#17172b"><text x="105" y="285" font-size="8" font-weight="bold">HEAVY-LIFT BOOSTER</text><text x="105" y="292" font-size="4">Colour every panel, then photograph this page.</text></g>
+</svg>

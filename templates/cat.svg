@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 210 297" width="210mm" height="297mm">
+  <rect width="210" height="297" fill="white"/>
+  <g fill="none" stroke="#17172b" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M76 42L98 66 132 42 122 72C144 96 138 130 128 160L118 195 105 214 92 195 82 160C72 130 66 96 88 72Z"/>
+    <path d="M123 180C132 187 143 179 148 169C153 160 152 148 159 144C164 141 169 145 168 151C166 165 162 180 153 188C144 197 128 196 119 189C115 186 117 181 123 180Z" fill="white"/>
+    <path d="M154 153C158 156 163 157 167 156M151 161C155 164 161 165 165 163"/>
+    <path d="M58 118H80M58 130H78M130 118H152M132 130H152"/>
+    <circle cx="105" cy="115" r="24"/><circle cx="105" cy="148" r="3"/>
+  </g>
+  <g font-family="Arial, sans-serif" text-anchor="middle" fill="#17172b"><text x="105" y="285" font-size="8" font-weight="bold">COMET CAT</text><text x="105" y="292" font-size="4">Colour every panel, then photograph this page.</text></g>
+</svg>

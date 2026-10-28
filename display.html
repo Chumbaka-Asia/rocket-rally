@@ -1,0 +1,1675 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#050418">
+  <title>Rocket Rally — Fleet display</title>
+  <style>
+    @font-face{font-family:"JetBrains Mono";font-style:normal;font-weight:400;font-display:swap;src:url("fonts/jetbrains-mono-400.woff2") format("woff2")}
+    @font-face{font-family:"JetBrains Mono";font-style:normal;font-weight:600;font-display:swap;src:url("fonts/jetbrains-mono-600.woff2") format("woff2")}
+    @font-face{font-family:"Unbounded";font-style:normal;font-weight:500;font-display:swap;src:url("fonts/unbounded-500.woff2") format("woff2")}
+    @font-face{font-family:"Unbounded";font-style:normal;font-weight:700;font-display:swap;src:url("fonts/unbounded-700.woff2") format("woff2")}
+    :root{--deep:#050418;--ink:#0e0b23;--violet:#6b4fd8;--ion:#6fe9ff;--flare:#ff4d9d;--ember:#ffc24a;--paper:#fff6e3}
+    *{box-sizing:border-box}
+    html,body{margin:0;width:100%;height:100%;overflow:hidden;background:var(--deep);color:var(--paper);font-family:"JetBrains Mono",ui-monospace,monospace}
+    #space,#fleet{position:fixed;inset:0;width:100%;height:100%;pointer-events:none}
+    #space{background:var(--deep)}#fleet{z-index:1}
+    #hud{position:fixed;z-index:3;inset:0;pointer-events:none;padding:clamp(16px,3vw,42px);display:flex;justify-content:space-between;align-items:flex-start}
+    .brand{font:700 clamp(18px,2.6vw,34px)/.92 "Unbounded",sans-serif;letter-spacing:-.02em;text-transform:uppercase;text-shadow:2px 2px 0 rgba(0,0,0,.4)}
+    #brandTitle{display:block;max-width:11em;overflow-wrap:anywhere}
+    .brand small{display:block;max-width:34em;margin-top:9px;font:600 10px/1.4 "JetBrains Mono",monospace;letter-spacing:.08em;color:#b7c3e9;text-transform:none}
+    .brandLogo{display:block;width:clamp(118px,14vw,170px);height:auto;margin-top:18px;padding:8px 10px;background:var(--paper);border:2px solid var(--ink);box-shadow:4px 4px 0 var(--flare);filter:none}
+    .readout{font-size:11px;text-align:right;line-height:1.8;color:#cfd3ec}
+    .live{color:var(--ion)}
+    #settingsBtn{pointer-events:auto;position:fixed;z-index:6;right:20px;bottom:20px;width:46px;height:46px;border:0;background:transparent;color:var(--paper);font-size:20px;cursor:pointer;transition:color .2s}
+    #settingsBtn:hover{color:var(--flare)}
+    #settingsBtn:focus-visible{outline:2px solid var(--paper);outline-offset:2px}
+    #musicCredit{position:fixed;z-index:5;right:78px;bottom:20px;height:46px;display:flex;align-items:center;gap:5px;max-width:min(560px,calc(100vw - 100px));color:var(--paper);font-size:10px;line-height:1.4;white-space:nowrap;overflow:hidden;text-shadow:0 1px 4px var(--deep);pointer-events:auto}
+    #musicCredit[hidden]{display:none}
+    #musicCredit a{color:var(--ion);text-decoration:underline;text-underline-offset:2px}
+    #musicCredit a:hover{color:var(--flare)}
+    @media(max-width:520px){#musicCredit{right:72px;max-width:calc(100vw - 88px);font-size:9px}}
+    #banner{position:fixed;z-index:4;left:0;right:0;bottom:0;padding:8vh 6vw 6vh;display:flex;flex-direction:column;align-items:center;text-align:center;background:linear-gradient(to top,rgba(5,4,24,.92),rgba(5,4,24,.55) 55%,transparent);opacity:0;transform:translateY(24px);transition:opacity .4s,transform .4s;pointer-events:none}
+    #banner.show{opacity:1;transform:translateY(0)}
+    .banner-name{font:700 clamp(34px,7.5vw,120px)/.96 "Unbounded",sans-serif;letter-spacing:-.02em}
+    .banner-rocket{margin-top:.4em;font:600 clamp(14px,2vw,22px) "JetBrains Mono",monospace;color:var(--ion);letter-spacing:.02em}
+    .banner-tag{margin-top:.6em;font:400 12px "JetBrains Mono",monospace;letter-spacing:.06em;color:#c9cdea}
+    @media(prefers-reduced-motion:reduce){#banner{transition:none}}
+    #joinCode{position:fixed;z-index:4;left:clamp(16px,3vw,42px);bottom:clamp(16px,3vw,42px);display:flex;gap:12px;align-items:center;background:var(--paper);color:var(--ink);border:3px solid var(--ink);box-shadow:5px 5px 0 var(--flare);padding:10px;pointer-events:none}
+    #joinCode[hidden]{display:none}
+    #joinCode canvas{width:clamp(140px,12vw,190px);height:auto;aspect-ratio:1;image-rendering:pixelated}
+    #joinCode canvas[hidden]{display:none}
+    #joinCode p{margin:0;font:600 11px/1.4 "JetBrains Mono",monospace;text-align:left}
+    #toast{position:fixed;z-index:9;left:50%;bottom:24px;transform:translateX(-50%) translateY(12px);min-width:220px;max-width:min(420px,84vw);padding:12px 18px;background:var(--ink);color:var(--paper);border:2px solid var(--paper);font:600 12px/1.4 "JetBrains Mono",monospace;text-align:center;opacity:0;transition:opacity .25s,transform .25s;pointer-events:none}
+    #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+    #panel{position:fixed;z-index:8;top:18px;right:18px;width:min(400px,calc(100vw - 36px));max-height:calc(100vh - 36px);overflow:auto;background:var(--paper);color:var(--ink);border:3px solid var(--ink);box-shadow:7px 7px 0 var(--flare);padding:20px;display:none}
+    #panel.open{display:block}
+    .panelHead{display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid var(--ink);padding-bottom:12px}
+    .panelHead h2{margin:0;font:700 18px "Unbounded",sans-serif;letter-spacing:-.03em}
+    .close{border:0;background:transparent;font-size:25px;cursor:pointer;color:var(--ink);line-height:1}
+    .panelSection{border-bottom:1px solid #cbbf9e;padding:15px 0}
+    .panelSection:last-child{border:0}
+    #recentTally{font:600 10.5px "JetBrains Mono",monospace;color:#4a476b}
+    .panel button,.fileButton{font:600 11px "JetBrains Mono",monospace;border:2px solid var(--ink);padding:9px 12px;background:var(--ion);color:var(--ink);cursor:pointer;box-shadow:2px 2px 0 var(--ink);transition:transform .15s,box-shadow .15s}
+    .panel button:hover,.fileButton:hover{transform:translate(1px,1px);box-shadow:1px 1px 0 var(--ink)}
+    .panel .danger{background:var(--flare)}
+    .panel .armed{background:var(--ink);color:var(--paper)}
+    .panel p{font-size:10.5px;line-height:1.6;margin:6px 0 0;color:#4a476b}
+    .toggle{display:flex;align-items:center;justify-content:space-between;gap:12px}
+    .qrSourceRow{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:12px;font-size:11px}
+    .qrSourceRow[hidden]{display:none}
+    .qrSourceRow select{min-width:140px;padding:8px;border:2px solid var(--ink);background:#fff;color:var(--ink);font:600 11px "JetBrains Mono",monospace}
+    .qrSourceRow input{flex:1;min-width:0;padding:8px;border:2px solid var(--ink);background:#fff;color:var(--ink);font:600 11px "JetBrains Mono",monospace}
+    .textRow{display:grid;grid-template-columns:64px 1fr;align-items:center;gap:10px;margin-top:10px;font-size:10.5px}
+    .textRow input{min-width:0;padding:8px;border:2px solid var(--ink);background:#fff;color:var(--ink);font:600 11px "JetBrains Mono",monospace}
+    details.panelSection>summary{cursor:pointer;list-style:none;font-weight:700;display:flex;justify-content:space-between;align-items:center}
+    details.panelSection>summary::-webkit-details-marker{display:none}
+    details.panelSection>summary::after{content:"";width:7px;height:7px;border:solid var(--ink);border-width:0 2px 2px 0;transform:rotate(45deg);margin:-3px 3px 0 0;transition:transform .15s}
+    details.panelSection[open]>summary::after{transform:rotate(225deg);margin-top:3px}
+    details.panelSection>summary:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
+    .musicRepeat{display:flex;align-items:center;gap:8px;margin-top:12px;font-size:10.5px;cursor:pointer}
+    .musicRepeat input{margin:0;accent-color:var(--flare)}
+    .tempoRow{display:grid;grid-template-columns:84px 1fr;align-items:center;gap:10px;margin-top:10px;font-size:10.5px}
+    .tempoRow input{width:100%;accent-color:var(--flare)}
+    .displayRow{display:grid;grid-template-columns:94px 1fr 42px;align-items:center;gap:10px;margin-top:12px;font-size:10.5px}
+    .displayRow input{width:100%;accent-color:var(--flare)}
+    .displayRow output{text-align:right;font-weight:600}
+    .tempoActions{display:flex;justify-content:flex-end;margin-top:12px}
+    .rocketRow{display:flex;gap:7px;align-items:center;padding:7px 0;border-top:1px dashed #b9ad88;font-size:10.5px}
+    .rocketRow span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .rocketRow button{padding:4px 7px;background:#fff}
+    .sr{position:absolute;width:1px;height:1px;clip:rect(0,0,0,0);overflow:hidden;white-space:nowrap}
+    @media(prefers-reduced-motion:reduce){#toast{transition:none}}
+  </style>
+</head>
+<body>
+  <canvas id="space"></canvas><canvas id="fleet"></canvas>
+  <div id="hud">
+    <div class="brand"><span id="brandTitle">Rocket<br>Rally</span><small id="brandSub">Shared starfleet</small><img class="brandLogo" src="images/chumbaka-logo.png" alt="Chumbaka"></div>
+    <div class="readout"><span class="live">● Live display</span><br><span id="count">0 rockets</span><br><span id="connection">Connecting…</span></div>
+  </div>
+  <div id="banner"><div class="banner-name" id="bannerName"></div><div class="banner-rocket" id="bannerRocket"></div><div class="banner-tag" id="bannerTag"></div></div>
+  <div id="joinCode" hidden><canvas id="joinCanvas" hidden></canvas><p>Colour a rocket.<br>Join the rally.</p></div>
+  <div id="toast" role="status" aria-live="polite"></div>
+  <div id="musicCredit" role="status" aria-live="polite" hidden><span>Music by</span><a id="musicCreditArtist" target="_blank" rel="noopener noreferrer"></a><span>from</span><a href="https://pixabay.com/" target="_blank" rel="noopener noreferrer">Pixabay</a></div>
+  <button id="settingsBtn" aria-label="Open operator settings" title="Operator settings">⚙</button>
+  <aside id="panel" class="panel" aria-label="Operator settings">
+    <div class="panelHead"><h2>Mission control</h2><button class="close" id="closePanel" aria-label="Close">×</button></div>
+    <div class="panelSection"><div class="toggle"><div><b>Sound</b><p id="soundState">Muted by default</p></div><button id="soundBtn">Enable</button></div><label class="musicRepeat"><input id="repeatSong" type="checkbox"><span>Repeat current song</span></label></div>
+    <div class="panelSection"><div class="toggle"><div><b>Join code</b><p id="qrState">Hidden on the display</p></div><button id="qrBtn">Show</button></div><label class="qrSourceRow" for="qrSource"><span>URL</span><select id="qrSource"><option value="auto">Upload page (auto)</option><option value="custom">Custom URL</option></select></label><label class="qrSourceRow" id="qrCustomRow" for="qrCustomUrl" hidden><input type="url" id="qrCustomUrl" placeholder="https://example.com" autocomplete="off" spellcheck="false"></label></div>
+    <div class="panelSection"><b>Display text</b>
+      <label class="textRow"><span>Title</span><input type="text" id="titleInput" maxlength="30" placeholder="Rocket Rally" autocomplete="off"></label>
+      <label class="textRow"><span>Subtitle</span><input type="text" id="subtitleInput" maxlength="60" placeholder="Shared starfleet" autocomplete="off"></label>
+    </div>
+    <details class="panelSection"><summary>Rally tempo</summary>
+      <div class="tempoRow"><span>Orbit speed</span><input type="range" id="orbitSpeed" min="0" max="100" value="50"></div>
+      <div class="tempoRow"><span>Scramble</span><input type="range" id="scrambleBalance" min="0" max="100" value="50"></div>
+      <div class="tempoActions"><button id="resetTempoBtn" type="button">Reset defaults</button></div>
+    </details>
+    <details class="panelSection"><summary>Fleet display</summary><p>Show the newest rockets. All rockets stay in the archive.</p>
+      <label class="displayRow"><span>Max rockets</span><input type="range" id="maxRockets" min="50" max="500" value="200"><output id="maxRocketsValue" for="maxRockets">200</output></label>
+      <label class="displayRow"><span>Rocket scale</span><input type="range" id="rocketScale" min="50" max="150" step="5" value="100"><output id="rocketScaleValue" for="rocketScale">100%</output></label>
+    </details>
+    <div class="panelSection"><b>Fleet archive</b><p>Download or restore a local JSON backup. Imports join the display quietly.</p><button id="exportBtn">Export</button> <button class="fileButton" id="importBtn">Import</button><input class="sr" id="importFile" type="file" accept="application/json"></div>
+    <div class="panelSection"><b>Recent rockets</b> <span id="recentTally"></span><div id="recent"></div></div>
+    <div class="panelSection"><button class="danger" id="clearBtn">Clear fleet</button><p>Clearing removes every stored rocket from connected displays. Tap twice to confirm.</p></div>
+  </aside>
+<script src="scripts/rocket-core.js"></script>
+<script src="scripts/qr.js"></script>
+<script>
+(() => {
+  const bg = document.getElementById('space'), bctx = bg.getContext('2d');
+  const canvas = document.getElementById('fleet'), ctx = canvas.getContext('2d');
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // ?demo (optional ?demo=N rocket count, 1–300) runs a synthetic fleet.
+  const demoParam = new URLSearchParams(location.search).get('demo');
+  const demo = demoParam !== null;
+  const DEMO_DEFAULT_COUNT = 12, DEMO_MAX_COUNT = 300;
+  const countEl = document.getElementById('count'), connectionEl = document.getElementById('connection');
+  const banner = document.getElementById('banner'), bannerName = document.getElementById('bannerName'), bannerRocket = document.getElementById('bannerRocket'), bannerTag = document.getElementById('bannerTag');
+  const toast = document.getElementById('toast');
+
+  const GOLDEN = 2.399963229728653, TWO_PI = Math.PI * 2;
+  const PALETTE = { deep: '#050418', ink: '#0e0b23', violet: '#6b4fd8', ion: '#6fe9ff', flare: '#ff4d9d', ember: '#ffc24a', paper: '#fff6e3' };
+  // Restrained Hubble-inspired color pairings: cool blue/teal light beside
+  // rose and amber emission hues. Dust remains nearly black.
+  const NEBULA_PALETTES = [
+    { cool: [76, 151, 205], warm: [230, 127, 137] },
+    { cool: [75, 171, 185], warm: [225, 158, 104] },
+    { cool: [112, 135, 196], warm: [205, 99, 125] }
+  ];
+
+  let W = 0, H = 0, DPR = 1, vp = { x: 0, y: 0 }, vpVelocity = { x: 0, y: 0 };
+  let vpTargetFrac = { x: .5, y: .38 }, vpWanderAt = 5, vpSweepUntil = -99;
+  let rockets = [], runtime = new Map(), launchQueue = [], activeLaunches = [];
+  let particles = [], dust = [], sparks = [];
+  let deepSkyLayers = [];
+  let nebulaGasLayers = [], nebulaDust = null, nebulaTravel = 0;
+  let then = performance.now() / 1000;
+  let warpBursts = [], warp = 1, burstAlign = 0;
+  let bankFlareT = -99;
+  let tempo = 0, tempoTarget = 0;
+  let spotlightItem = null, spotlightAt = 4;
+  let lastLaunch = -99, lastBank = -99;
+  let soundOn = false, repeatSong = false;
+  let demoPulseAt = 0;
+  const DEFAULT_ORBIT_SPEED = 50, DEFAULT_SCRAMBLE_BALANCE = 50;
+  const DEFAULT_MAX_ROCKETS = 200, DEFAULT_ROCKET_SCALE = 100;
+  let orbitSpeedSetting = DEFAULT_ORBIT_SPEED / 100, scrambleBalance = DEFAULT_SCRAMBLE_BALANCE / 100;
+  let maxRockets = DEFAULT_MAX_ROCKETS, rocketScale = DEFAULT_ROCKET_SCALE / 100;
+
+  // ---------- persisted operator settings ----------
+  function loadSettings() {
+    try { orbitSpeedSetting = clamp(+localStorage.getItem('rocket-rally-orbit-speed'), 0, 100) / 100; } catch (_) {}
+    if (!Number.isFinite(orbitSpeedSetting)) orbitSpeedSetting = DEFAULT_ORBIT_SPEED / 100;
+    try { scrambleBalance = clamp(+localStorage.getItem('rocket-rally-scramble-balance'), 0, 100) / 100; } catch (_) {}
+    if (!Number.isFinite(scrambleBalance)) scrambleBalance = DEFAULT_SCRAMBLE_BALANCE / 100;
+    try { repeatSong = localStorage.getItem('rocket-rally-music-repeat') === '1'; } catch (_) {}
+    try {
+      const saved = localStorage.getItem('rocket-rally-max-rockets');
+      if (saved !== null && Number.isFinite(+saved)) maxRockets = Math.round(clamp(+saved, 50, 500));
+    } catch (_) {}
+    try {
+      const saved = localStorage.getItem('rocket-rally-rocket-scale');
+      if (saved !== null && Number.isFinite(+saved)) rocketScale = Math.round(clamp(+saved, 50, 150) / 5) * .05;
+    } catch (_) {}
+  }
+  loadSettings();
+
+  // ---------- seeding ----------
+  function hashSeed(str) {
+    let h = 2166136261;
+    for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
+    return ((h >>> 0) % 100000) / 100000;
+  }
+
+  // ---------- layout / resize ----------
+  function resize() {
+    const prevW = W, prevH = H, hadField = particles.length > 0;
+    const prevVp = { x: vp.x, y: vp.y };
+    DPR = Math.min(devicePixelRatio || 1, 1.75); W = innerWidth; H = innerHeight;
+    for (const c of [bg, canvas]) { c.width = Math.floor(W * DPR); c.height = Math.floor(H * DPR); c.getContext('2d').setTransform(DPR, 0, 0, DPR, 0, 0); }
+    vp = { x: W * .5, y: H * .38 };
+    if (prevW > 0 && prevH > 0) {
+      const sx = W / prevW, sy = H / prevH;
+      const scalePoint = (p) => { p.x = vp.x + (p.x - prevVp.x) * sx; p.y = vp.y + (p.y - prevVp.y) * sy; p.vx *= sx; p.vy *= sy; };
+      for (const p of particles) scalePoint(p);
+      for (const d of dust) scalePoint(d);
+      for (const s of sparks) scalePoint(s);
+      for (const burst of warpBursts) {
+        burst.x = vp.x + (burst.x - prevVp.x) * sx;
+        burst.y = vp.y + (burst.y - prevVp.y) * sy;
+      }
+      for (const item of runtime.values()) {
+        if (item.px != null) {
+          item.px = vp.x + (item.px - prevVp.x) * sx;
+          item.py = vp.y + (item.py - prevVp.y) * sy;
+          item.vx *= sx; item.vy *= sy;
+        }
+      }
+    }
+    vpVelocity = { x: 0, y: 0 };
+    if (!hadField) {
+      makeField();
+    } else {
+      const prevExtent = Math.max(prevW, prevH) || 1, extent = Math.max(W, H);
+      const scale = extent / prevExtent;
+      for (const p of particles) p.r *= scale;
+      for (const d of dust) d.r *= scale;
+    }
+    makeNebulaField();
+    makeDeepSky();
+  }
+
+  // Initial population spreads seeds across the whole field so the scene looks
+  // lived-in at first paint. Recycling (a particle reaching the edge) always
+  // respawns tight to the gate instead, so stars visibly stream outward from
+  // the gate rather than popping into existence mid-field.
+  function makeField() {
+    const amount = Math.round(Math.min(560, Math.max(200, W * H / 3800)));
+    particles = Array.from({ length: amount }, (_, i) => spreadParticle(i / amount));
+    dust = Array.from({ length: 60 }, (_, i) => spreadDust(i / 60));
+  }
+  function particleHue(seed) { return seed > .73 ? PALETTE.flare : seed > .45 ? PALETTE.ion : PALETTE.paper; }
+  function emittedState(a, r, speed) {
+    const x = vp.x + Math.cos(a) * r, y = vp.y + Math.sin(a) * r;
+    return { x, y, vx: Math.cos(a) * speed, vy: Math.sin(a) * speed, r };
+  }
+  function freshParticle(seed) {
+    const a = (seed * GOLDEN * 22) % TWO_PI, r = 6 + ((seed * 53) % 1) * 30;
+    const z = .35 + ((seed * 17) % 1) * .65;
+    return Object.assign(emittedState(a, r, (24 + r * .38) * z), { z, h: particleHue(seed) });
+  }
+  function spreadParticle(seed) {
+    const a = (seed * GOLDEN * 22) % TWO_PI, r = 8 + seed * Math.min(W, H) * .86;
+    const z = .35 + ((seed * 17) % 1) * .65;
+    return Object.assign(emittedState(a, r, (24 + r * .38) * z), { z, h: particleHue(seed) });
+  }
+  function dustShape(seed, r) {
+    const a = (seed * GOLDEN * 9) % TWO_PI;
+    const z = .3 + ((seed * 13) % 1) * .5;
+    return Object.assign(emittedState(a, r, (14 + r * .3) * z * .8), { z, curl: (seed - .5) * .0012 });
+  }
+  function freshDust(seed) { return dustShape(seed, 4 + ((seed * 29) % 1) * 20); }
+  function spreadDust(seed) { return dustShape(seed, 4 + seed * Math.min(W, H) * .8); }
+
+  function nebulaNoise(x, y, seed) {
+    const xi = Math.floor(x), yi = Math.floor(y), fx = x - xi, fy = y - yi;
+    const hash = (a, b) => {
+      let h = Math.imul(a + seed * 137, 374761393) + Math.imul(b - seed * 71, 668265263);
+      h = Math.imul(h ^ (h >>> 13), 1274126177);
+      return ((h ^ (h >>> 16)) >>> 0) / 4294967295;
+    };
+    const sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy);
+    const top = hash(xi, yi) * (1 - sx) + hash(xi + 1, yi) * sx;
+    const bottom = hash(xi, yi + 1) * (1 - sx) + hash(xi + 1, yi + 1) * sx;
+    return top * (1 - sy) + bottom * sy;
+  }
+  function nebulaFbm(x, y, seed) {
+    return nebulaNoise(x, y, seed) * .5 + nebulaNoise(x * 2, y * 2, seed + 1) * .27 +
+      nebulaNoise(x * 4, y * 4, seed + 2) * .15 + nebulaNoise(x * 8, y * 8, seed + 3) * .08;
+  }
+  function makeNebulaField() {
+    // The textures are built only on resize. Coherent noise joins the wisps
+    // into broad gas streams; the darker texture cuts dust lanes through them.
+    const scale = Math.min(.58, 1150 / Math.max(W, H));
+    const width = Math.max(1, Math.round(W * scale)), height = Math.max(1, Math.round(H * scale));
+    nebulaGasLayers = NEBULA_PALETTES.map(() => document.createElement('canvas'));
+    nebulaDust = document.createElement('canvas');
+    for (const layer of [...nebulaGasLayers, nebulaDust]) { layer.width = width; layer.height = height; }
+    const gasContexts = nebulaGasLayers.map(layer => layer.getContext('2d'));
+    const dustCtx = nebulaDust.getContext('2d');
+    const gases = gasContexts.map(cx => cx.createImageData(width, height));
+    const shade = dustCtx.createImageData(width, height);
+    const smooth = (a, b, value) => {
+      const f = clamp((value - a) / (b - a), 0, 1);
+      return f * f * (3 - 2 * f);
+    };
+    for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+      const u = x / width, v = y / height;
+      const warp = (nebulaFbm(u * 4.2, v * 3.8, 11) - .5) * .2;
+      const flow = .47 + .12 * Math.sin(u * 6.5) + .045 * Math.sin(u * 17);
+      const sampleY = v + warp;
+      const main = Math.exp(-Math.pow((sampleY - flow) / (.16 + .035 * Math.sin(u * 9)), 2));
+      const upper = Math.exp(-Math.pow((sampleY - flow + .17 + .055 * Math.sin(u * 8 + 1)) / .095, 2));
+      const lower = Math.exp(-Math.pow((sampleY - flow - .17 - .05 * Math.sin(u * 10)) / .11, 2));
+      const ends = smooth(.025, .17, u) * (1 - smooth(.82, .975, u));
+      const body = Math.min(1, (.72 * main + .48 * upper + .43 * lower) * ends);
+      if (body < .005) continue;
+      const folds = nebulaFbm(u * 10, v * 10, 23);
+      const threads = nebulaFbm(u * 31, v * 29, 37);
+      const brightness = smooth(.26, .72, folds) * (.55 + .45 * threads);
+      const alpha = body * (.09 + .46 * brightness);
+      const warm = smooth(.3, .75, nebulaFbm(u * 3.6 + 3, v * 3.6, 53));
+      const i = (y * width + x) * 4;
+      for (let p = 0; p < NEBULA_PALETTES.length; p++) {
+        const gas = gases[p].data, palette = NEBULA_PALETTES[p];
+        for (let channel = 0; channel < 3; channel++) {
+          gas[i + channel] = Math.round(palette.cool[channel] + (palette.warm[channel] - palette.cool[channel]) * warm);
+        }
+        gas[i + 3] = Math.round(alpha * 255);
+      }
+      const dark = smooth(.5, .7, nebulaFbm(u * 14 + 7, v * 12 + 5, 71));
+      shade.data[i] = 5; shade.data[i + 1] = 6; shade.data[i + 2] = 21;
+      shade.data[i + 3] = Math.round(body * dark * .48 * 255);
+    }
+    gasContexts.forEach((cx, index) => cx.putImageData(gases[index], 0, 0));
+    dustCtx.putImageData(shade, 0, 0);
+  }
+  function hexAlpha(hex, a) {
+    const n = parseInt(hex.slice(1), 16);
+    return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+  }
+
+  function makeDeepSky() {
+    const size = 1600;
+    // Each layer is deliberately just stars: the previous rotated luminous
+    // rectangle read as a hard diagonal stripe instead of distant atmosphere.
+    // Large canvases keep the layers edge-free even while they drift and turn.
+    const specs = [
+      { count: 520, radius: [.28, .68], alpha: [.10, .28], opacity: .58, parallax: .035, scale: 1.82, drift: -.000022 },
+      { count: 180, radius: [.55, 1.15], alpha: [.16, .44], opacity: .62, parallax: .09, scale: 1.94, drift: .000035 },
+      { count: 48, radius: [1.0, 1.85], alpha: [.24, .62], opacity: .72, parallax: .17, scale: 2.08, drift: -.000052 }
+    ];
+    deepSkyLayers = specs.map((spec, layerIndex) => {
+      const canvas = document.createElement('canvas'); canvas.width = size; canvas.height = size;
+      const cx = canvas.getContext('2d');
+      for (let i = 0; i < spec.count; i++) {
+        const x = Math.random() * size, y = Math.random() * size;
+        const radius = spec.radius[0] + Math.random() * (spec.radius[1] - spec.radius[0]);
+        const alpha = spec.alpha[0] + Math.random() * (spec.alpha[1] - spec.alpha[0]);
+        const tinted = layerIndex === 2 && Math.random() < .22;
+        const color = tinted ? (Math.random() < .5 ? PALETTE.ion : PALETTE.flare) : PALETTE.paper;
+        cx.fillStyle = hexAlpha(color, alpha);
+        cx.beginPath(); cx.arc(x, y, radius, 0, TWO_PI); cx.fill();
+        if (layerIndex === 2 && radius > 1.45) {
+          cx.fillStyle = hexAlpha(color, alpha * .2);
+          cx.beginPath(); cx.arc(x, y, radius * 3.2, 0, TWO_PI); cx.fill();
+        }
+      }
+      return Object.assign({ canvas, angle: (layerIndex - 1) * .08 }, spec);
+    });
+  }
+
+  // ---------- fleet math ----------
+  function ringFor(i) { return Math.floor(Math.sqrt(i)); }
+  // A stable-but-random-looking angle per (ring, position) rather than an
+  // evenly-spaced fan — combined with applySeparation only preventing
+  // genuine visual overlap (not enforcing even spacing), arrivals merge
+  // into varied, organic positions instead of snapping into a tidy ring.
+  function slotAngleSeed(ring, i) { return hashSeed(ring + ':' + i) * TWO_PI; }
+  function radiusFrac(d) { return .06 + .76 * Math.pow(d, .7); }
+  function sizeFrac(d) { return .30 + .75 * Math.pow(d, 1.2); }
+  function depthPoint(ring, angle, maxRing) {
+    const denom = Math.max(1, maxRing), d = maxRing === 0 ? 1 : ring / denom;
+    return { d, x: vp.x + Math.cos(angle) * radiusFrac(d) * W * .56, y: vp.y + Math.sin(angle) * radiusFrac(d) * H * .42 };
+  }
+
+  function makeRuntime(record) {
+    const seed = hashSeed(record.id);
+    return {
+      record, img: null,
+      angle: seed * TWO_PI, angularVel: 0, roll: 0,
+      dCurrent: 1, dTarget: 1,
+      speedMul: .68 + ((seed * 83) % 1) * .74,
+      surgePhase: seed * TWO_PI, surgeFreq: .12 + ((seed * 37) % 1) * .22,
+      driftPhase: seed * TWO_PI, driftFreq: .05 + ((seed * 43) % 1) * .09, driftAmp: .1 + ((seed * 59) % 1) * .16,
+      overtakeUntil: 0, overtakeStrength: 1, nextOvertakeAt: 2 + seed * 6,
+      spin: 1, reversalT: -99, nextReversalAt: 10 + ((seed * 61) % 1) * 24,
+      phase: seed * TWO_PI,
+      spotlightUntil: 0,
+      px: null, py: null, vx: 0, vy: 0,
+      heading: null,
+      visible: true, queued: false, launch: null
+    };
+  }
+
+  function downscale(img, maxEdge) {
+    const scale = Math.min(1, maxEdge / Math.max(img.naturalWidth, img.naturalHeight));
+    if (scale >= 1) return img;
+    const c = document.createElement('canvas');
+    c.width = Math.round(img.naturalWidth * scale); c.height = Math.round(img.naturalHeight * scale);
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    return c;
+  }
+
+  function updateCount() {
+    const total = rockets.length;
+    countEl.textContent = `${total} rocket${total === 1 ? '' : 's'}` + (total > maxRockets ? ` · ${maxRockets} shown` : '');
+    renderRecent();
+  }
+
+  async function addRocket(record, launch) {
+    if (runtime.has(record.id)) {
+      // A submission can arrive while hydrateNetwork() is finishing. In that
+      // race the saved record is already present when its SSE event arrives;
+      // promote it into the launch queue instead of dropping the animation.
+      const item = runtime.get(record.id);
+      if (launch && !item.launch && !item.queued) {
+        item.visible = false; item.queued = true; launchQueue.push(item);
+      }
+      return;
+    }
+    const item = makeRuntime(record);
+    rockets.push(record); runtime.set(record.id, item);
+    loadImage(record.imageDataURL).then(img => { item.img = downscale(img, 340); }).catch(() => {});
+    if (launch) { item.visible = false; item.queued = true; launchQueue.push(item); }
+    updateCount();
+  }
+  function removeRocket(id) {
+    rockets = rockets.filter(item => item.id !== id);
+    runtime.delete(id);
+    launchQueue = launchQueue.filter(item => item.record.id !== id);
+    activeLaunches = activeLaunches.filter(item => item.record.id !== id);
+    updateCount();
+  }
+  function clearRockets() { rockets = []; runtime.clear(); launchQueue = []; activeLaunches = []; updateCount(); }
+
+  function syntheticImage(index) {
+    const c = document.createElement('canvas'); c.width = 180; c.height = 280;
+    const x = c.getContext('2d'), colors = ['#ff4d9d', '#6fe9ff', '#ffc24a', '#6b4fd8', '#3dffb0'];
+    x.clearRect(0, 0, 180, 280);
+    x.fillStyle = colors[index % colors.length]; x.strokeStyle = '#17172b'; x.lineWidth = 8;
+    x.beginPath(); x.moveTo(90, 12); x.quadraticCurveTo(40, 68, 48, 183); x.lineTo(20, 230); x.lineTo(64, 217); x.lineTo(74, 260); x.lineTo(106, 260); x.lineTo(116, 217); x.lineTo(160, 230); x.lineTo(132, 183); x.quadraticCurveTo(140, 68, 90, 12); x.closePath(); x.fill(); x.stroke();
+    x.fillStyle = '#fff6e3'; x.beginPath(); x.arc(90, 108, 28, 0, 7); x.fill(); x.stroke();
+    x.strokeStyle = '#17172b'; x.beginPath(); x.moveTo(50, 177); x.lineTo(130, 177); x.moveTo(67, 210); x.lineTo(113, 210); x.stroke();
+    return c.toDataURL();
+  }
+  const DEMO_TEST_ROCKETS = [
+    { file: 'images/test-rocket-01.png', templateId: 'cat', name: 'Comet Cat' },
+    { file: 'images/test-rocket-02.png', templateId: 'classic', name: 'Classic Rocket' },
+    { file: 'images/test-rocket-03.png', templateId: 'dart', name: 'Dart Cruiser' },
+    { file: 'images/test-rocket-04.png', templateId: 'explorer', name: 'Star Explorer' },
+    { file: 'images/test-rocket-05.png', templateId: 'heavy', name: 'Heavy-Lift Booster' },
+    { file: 'images/test-rocket-06.png', templateId: 'hopper', name: 'Moon Hopper' },
+    { file: 'images/test-rocket-07.png', templateId: 'jelly', name: 'Jelly Drifter' },
+    { file: 'images/test-rocket-08.png', templateId: 'saucer', name: 'Saucer Scout' },
+    { file: 'images/test-rocket-09.png', templateId: 'shuttle', name: 'Winged Shuttle' },
+    { file: 'images/test-rocket-10.png', templateId: 'whale', name: 'Star Whale' }
+  ];
+  async function colouredDemoImage(file) {
+    const img = await loadImage(file);
+    // Test files are printable sheets. Keep only the illustrated upper area,
+    // turn the white paper transparent, then trim it just as a submitted
+    // rocket would be trimmed before appearing in the rally.
+    const source = document.createElement('canvas');
+    source.width = img.naturalWidth; source.height = Math.round(img.naturalHeight * .87);
+    const sourceCtx = source.getContext('2d'); sourceCtx.drawImage(img, 0, 0);
+    const pixels = sourceCtx.getImageData(0, 0, source.width, source.height);
+    let left = source.width, top = source.height, right = -1, bottom = -1;
+    for (let i = 0; i < pixels.data.length; i += 4) {
+      const r = pixels.data[i], g = pixels.data[i + 1], b = pixels.data[i + 2];
+      if (r > 245 && g > 245 && b > 245) { pixels.data[i + 3] = 0; continue; }
+      const p = i / 4, x = p % source.width, y = Math.floor(p / source.width);
+      left = Math.min(left, x); right = Math.max(right, x); top = Math.min(top, y); bottom = Math.max(bottom, y);
+    }
+    sourceCtx.putImageData(pixels, 0, 0);
+    if (right < left || bottom < top) return file;
+    const pad = 18, x = Math.max(0, left - pad), y = Math.max(0, top - pad);
+    const width = Math.min(source.width - x, right - left + pad * 2), height = Math.min(source.height - y, bottom - top + pad * 2);
+    const cropped = document.createElement('canvas'); cropped.width = width; cropped.height = height;
+    cropped.getContext('2d').drawImage(source, x, y, width, height, 0, 0, width, height);
+    return cropped.toDataURL();
+  }
+  const DEMO_TEMPLATES = Object.keys(ROCKET_TEMPLATES);
+  async function createDemo() {
+    const requested = Math.min(Math.max(parseInt(demoParam, 10) || DEMO_DEFAULT_COUNT, 1), DEMO_MAX_COUNT);
+    for (let i = 0; i < requested; i++) {
+      const testRocket = DEMO_TEST_ROCKETS[i];
+      let colouredRocket = testRocket, imageDataURL = syntheticImage(i);
+      if (testRocket) {
+        try { imageDataURL = await colouredDemoImage(testRocket.file); }
+        catch (_) { colouredRocket = null; }
+      }
+      await addRocket({
+        version: 1, id: `demo-${i}`, imageDataURL,
+        templateId: colouredRocket ? colouredRocket.templateId : DEMO_TEMPLATES[i % DEMO_TEMPLATES.length],
+        childName: 'Demo pilot', rocketName: colouredRocket ? colouredRocket.name : `Nova-${i + 1}`,
+        createdAt: Date.now() - i * 1000
+      }, i < 3);
+    }
+    connectionEl.textContent = 'Test flight';
+  }
+
+  // ---------- banner ----------
+  let bannerTimer = 0;
+  function publicName(value) {
+    const name = typeof value === 'string' ? value.trim() : '';
+    return /^unnamed(?:\s+(?:pilot|rocket|child))?$/i.test(name) ? '' : name;
+  }
+  function showBanner(child, rocket, tag, seconds) {
+    const pilotName = publicName(child), rocketName = publicName(rocket);
+    if (!pilotName || !rocketName) {
+      banner.classList.remove('show'); bannerTimer = 0;
+      bannerName.textContent = ''; bannerRocket.textContent = ''; bannerTag.textContent = '';
+      return;
+    }
+    bannerName.textContent = pilotName; bannerRocket.textContent = rocketName; bannerTag.textContent = tag;
+    banner.classList.add('show'); bannerTimer = performance.now() / 1000 + seconds;
+  }
+
+  // ---------- toast (replaces alert()) ----------
+  let toastTimer = 0;
+  function showToast(message) { toast.textContent = message; toast.classList.add('show'); toastTimer = performance.now() / 1000 + 3.2; }
+
+  // ---------- armed confirm (replaces confirm()) ----------
+  function armConfirm(button, armedLabel, action) {
+    let armed = false, revertTimer = null;
+    const original = button.textContent;
+    button.addEventListener('click', () => {
+      if (!armed) {
+        armed = true; button.textContent = armedLabel; button.classList.add('armed');
+        revertTimer = setTimeout(() => { armed = false; button.textContent = original; button.classList.remove('armed'); }, 3000);
+        return;
+      }
+      clearTimeout(revertTimer); armed = false; button.textContent = original; button.classList.remove('armed');
+      action();
+    });
+  }
+
+  // ---------- warp burst / bank / reversal envelopes ----------
+  function burstEnvelope(e, peak, under) {
+    const A = .18, H = .45, D = 2.0, R = .6;
+    if (e < 0) return 0;
+    if (e < A) return peak * easeOutCubic(e / A);
+    e -= A; if (e < H) return peak;
+    e -= H; if (e < D) return peak + (under - peak) * easeInOutCubic(e / D);
+    e -= D; if (e < R) return under + (0 - under) * easeInOutCubic(e / R);
+    return null;
+  }
+  function triggerWarpBurst(t) { warpBursts.push({ t0: t, x: vp.x, y: vp.y }); spawnSparks(t); }
+  // A one-off shower of new particles bursting out of the gate at the
+  // instant of a launch — the star streaks only speed up the EXISTING
+  // field, which reads as motion but not as something being emitted; this
+  // is a genuinely new, short-lived population layered on top.
+  function spawnSparks(t) {
+    const count = reduced ? 7 : 30;
+    for (let i = 0; i < count; i++) {
+      const a = Math.random() * TWO_PI;
+      const speed = 70 + Math.random() * 110;
+      sparks.push({
+        x: vp.x, y: vp.y, vx: Math.cos(a) * speed, vy: Math.sin(a) * speed, r: 6 + Math.random() * 10,
+        speed, born: t, life: 1.0 + Math.random() * .7,
+        hue: Math.random() < .5 ? PALETTE.ember : PALETTE.ion
+      });
+    }
+  }
+  function updateSparks(t, dt) {
+    if (!sparks.length) return;
+    sparks = sparks.filter(s => t - s.born < s.life);
+    bctx.save(); bctx.globalCompositeOperation = 'lighter';
+    for (const s of sparks) {
+      stepEmitted(s, dt, 1 + (warp - 1) * .3, s.speed * (1 + (warp - 1) * .3), 28, 75);
+      const p = clamp((t - s.born) / s.life, 0, 1);
+      bctx.fillStyle = hexAlpha(s.hue, (1 - p) * .85);
+      bctx.beginPath(); bctx.arc(s.x, s.y, Math.max(.4, 2.4 * (1 - p * .6)), 0, TWO_PI); bctx.fill();
+    }
+    bctx.restore();
+  }
+  function updateWarp(t) {
+    const peak = reduced ? 1.2 : 8, under = reduced ? 0 : -.15;
+    let sum = 0, strongestAlignment = 0;
+    warpBursts = warpBursts.filter(b => {
+      const v = burstEnvelope(t - b.t0, peak, under);
+      if (v === null) return false;
+      sum += v; return true;
+    });
+    // The fleet uses the same timing as the warp flash, but stays within a
+    // clean 0..1 range. A second launch while the first is fading keeps the
+    // formation tucked in rather than stacking a stronger turn.
+    for (const burst of warpBursts) {
+      const alignment = burstEnvelope(t - burst.t0, 1, 0);
+      if (alignment != null) strongestAlignment = Math.max(strongestAlignment, clamp(alignment, 0, 1));
+    }
+    burstAlign = strongestAlignment;
+    warp = 1 + clamp(sum, under, 10);
+  }
+  function triggerBank(t) {
+    bankFlareT = t; lastBank = t;
+  }
+
+  // ---------- the wandering gate ----------
+  // The vanishing point drifts slowly on its own and sweeps further every
+  // few cycles, so the scene reads as flying a curving space track rather
+  // than orbiting one fixed point. Rockets and emitted effects now keep
+  // world-space state and react through their own steering/velocity updates.
+  // This is independent of
+  // any single rocket's own orbit direction (see advanceAngle) — the two
+  // used to be tied to one global reversal, which made the whole fleet spin
+  // in lockstep; now each rocket keeps its own randomised timing.
+  let vpWanderCount = 0;
+  function pickVanishingWander(t) {
+    vpWanderCount++;
+    const big = vpWanderCount % 3 === 0;
+    const rx = big ? .34 : .15, ry = big ? .2 : .1;
+    vpTargetFrac = { x: .5 + (Math.random() * 2 - 1) * rx, y: .38 + (Math.random() * 2 - 1) * ry };
+    vpWanderAt = t + (big ? 11 : 6) + Math.random() * 4;
+    if (big) vpSweepUntil = t + 2.4;
+  }
+  function updateVanishingPoint(t, dt) {
+    if (t > vpWanderAt) pickVanishingWander(t);
+    const targetX = vpTargetFrac.x * W, targetY = vpTargetFrac.y * H;
+    // A big sweep moves the horizon point at a snappier rate than the
+    // otherwise-lazy continuous drift, so the direction change itself reads
+    // as a decisive swerve through the track rather than a gentle wobble.
+    const sweeping = t < vpSweepUntil;
+    const rate = reduced ? .1 : (sweeping ? .9 : .32);
+    const beforeX = vp.x, beforeY = vp.y;
+    vp.x += (targetX - vp.x) * Math.min(1, dt * rate);
+    vp.y += (targetY - vp.y) * Math.min(1, dt * rate);
+    const invDt = dt > 0 ? 1 / dt : 0;
+    vpVelocity.x = (vp.x - beforeX) * invDt;
+    vpVelocity.y = (vp.y - beforeY) * invDt;
+  }
+  function updateBank(t, dt) {
+    let bankFlare = 0;
+    if (bankFlareT > -50) {
+      const e = t - bankFlareT, A = .2, H = .3, D = 1.3;
+      if (e < A) bankFlare = easeOutCubic(e / A);
+      else if (e < A + H) bankFlare = 1;
+      else if (e < A + H + D) bankFlare = 1 - easeInOutCubic((e - A - H) / D);
+      else bankFlareT = -99;
+    }
+    return bankFlare;
+  }
+
+  // ---------- fleet physics ----------
+  function updateFleet(t, dt, tempoNow, displayRecords) {
+    let maxRing = 0;
+    const ringGroups = new Map();
+    displayRecords.forEach((record, i) => {
+      const ring = ringFor(i);
+      if (ring > maxRing) maxRing = ring;
+      const item = runtime.get(record.id);
+      if (!item) return;
+      item.ring = ring; item.ageIndex = i;
+      if (item.launch || item.queued) return;
+      if (!ringGroups.has(ring)) ringGroups.set(ring, []);
+      ringGroups.get(ring).push(item);
+    });
+    const denom = Math.max(1, maxRing);
+    const bankFlare = updateBank(t, dt);
+    for (const record of displayRecords) {
+      const item = runtime.get(record.id);
+      if (!item || item.launch || item.queued) continue;
+      const baseD = maxRing === 0 ? 1 : item.ring / denom;
+      // A settled rocket doesn't hold its ring distance forever — a slow,
+      // per-rocket sine wander (same trick as surgePhase/surgeFreq above)
+      // nudges it nearer or farther over roughly a minute or two, so the
+      // fleet keeps breathing instead of freezing into its arrival slots.
+      // Because size and radius both derive from d, drifting closer also
+      // reads as growing bigger, drifting away as shrinking — no separate
+      // size change needed.
+      const drift = Math.sin(t * item.driftFreq + item.driftPhase) * item.driftAmp;
+      const d = clamp(baseD + drift, .05, 1.08);
+      item.dTarget = (t < item.spotlightUntil) ? Math.max(d, .92) : d;
+      item.dCurrent += (item.dTarget - item.dCurrent) * Math.min(1, dt * .9);
+      advanceAngle(item, t, dt, tempoNow);
+      seekPosition(item, dt);
+      updateRocketHeading(item, dt, burstAlign);
+    }
+    for (const [, group] of ringGroups) if (group.length > 1) applySeparation(group, dt);
+    return bankFlare;
+  }
+
+  // Each rocket keeps its own orbit direction and reverses it on its own
+  // randomised schedule — a shared global spin flipped every rocket in
+  // lockstep, which read as the whole fleet spinning as one rigid body
+  // rather than a pack of independent craft.
+  function updateRocketSpin(item, t) {
+    let spinMul = 1;
+    if (item.reversalT > -50) {
+      const e = t - item.reversalT, dur = reduced ? .6 : 1.8;
+      const p = clamp(e / dur, 0, 1);
+      spinMul = Math.cos(p * Math.PI);
+      if (p >= 1) { item.spin = -item.spin; item.reversalT = -99; }
+    } else if (t > item.nextReversalAt && !reduced) {
+      item.reversalT = t;
+      item.nextReversalAt = t + 16 + Math.random() * 18;
+    }
+    return spinMul;
+  }
+
+  function advanceAngle(item, t, dt, tempoNow) {
+    const spinMul = updateRocketSpin(item, t);
+    const base = .05 + orbitSpeedSetting * .22;
+    const speed = base * (.55 + .9 * item.dCurrent) * item.speedMul;
+    const surgeAmp = reduced ? .05 : .25 + tempoNow * .55;
+    const surge = 1 + Math.sin(t * item.surgeFreq + item.surgePhase) * surgeAmp;
+    let overtakeMul = 1;
+    if (item.overtakeUntil) {
+      if (t < item.overtakeUntil) overtakeMul = item.overtakeStrength;
+      else item.overtakeUntil = 0;
+    }
+    if (!item.overtakeUntil && t > item.nextOvertakeAt && !reduced) {
+      item.overtakeUntil = t + 1.1 + Math.random() * .8;
+      item.overtakeStrength = 1.5 + Math.random() * .7 + tempoNow * .6;
+      item.nextOvertakeAt = t + Math.max(1.5, 4 + Math.random() * 5 - tempoNow * 3 - scrambleBalance * 2);
+    }
+    const angularVel = speed * surge * overtakeMul * item.spin * spinMul;
+    item.angularVel = angularVel;
+    item.angle += angularVel * dt;
+  }
+
+  // The waypoint (vp) pulls the fleet toward it rather than carrying it: each
+  // rocket keeps its own screen position and eases it toward its current
+  // lane slot (vp plus its orbital angle/radius) rather than snapping there
+  // every frame. When vp drifts continuously this is barely visible — the
+  // slot moves a little, the rocket follows closely, reading as being drawn
+  // toward the waypoint. When vp does a big sweep (see pickVanishingWander),
+  // the slot jumps well ahead and the rocket visibly has to fly to catch up.
+  function seekPosition(item, dt) {
+    const targetX = vp.x + Math.cos(item.angle) * radiusFrac(item.dCurrent) * W * .56;
+    const targetY = vp.y + Math.sin(item.angle) * radiusFrac(item.dCurrent) * H * .42;
+    if (item.px == null) { item.px = targetX; item.py = targetY; item.vx = 0; item.vy = 0; return; }
+    const stiffness = reduced ? 3.6 : 6.25;
+    const damping = reduced ? 4.8 : 5.0;
+    item.vx += ((targetX - item.px) * stiffness - item.vx * damping) * dt;
+    item.vy += ((targetY - item.py) * stiffness - item.vy * damping) * dt;
+    const maxSpeed = Math.min(W, H) * (reduced ? .25 : .7);
+    const speed = Math.hypot(item.vx, item.vy);
+    if (speed > maxSpeed) { const scale = maxSpeed / speed; item.vx *= scale; item.vy *= scale; }
+    item.px += item.vx * dt; item.py += item.vy * dt;
+  }
+
+  function angleDelta(from, to) {
+    return Math.atan2(Math.sin(to - from), Math.cos(to - from));
+  }
+
+  // Integrate an emitted object in world space. The softened attraction is
+  // intentionally capped: a moved waypoint bends the stream without ever
+  // teleporting or instantly reversing an outward-moving particle.
+  function stepEmitted(p, dt, speedScale, targetSpeed, attraction, maxAccel) {
+    const dx = vp.x - p.x, dy = vp.y - p.y, dist = Math.hypot(dx, dy);
+    const soft = Math.max(22, Math.min(W, H) * .08);
+    const falloff = dist / (dist + soft);
+    const sourceMotion = 1 + clamp(Math.hypot(vpVelocity.x, vpVelocity.y) / 220, 0, 1.5);
+    const accel = clamp(attraction * speedScale * falloff * sourceMotion, 0, maxAccel);
+    if (dist > .001) { p.vx += dx / dist * accel * dt; p.vy += dy / dist * accel * dt; }
+    const currentSpeed = Math.hypot(p.vx, p.vy) || 1;
+    const adjustedSpeed = currentSpeed + (targetSpeed - currentSpeed) * Math.min(1, dt * 2.5);
+    p.vx *= adjustedSpeed / currentSpeed; p.vy *= adjustedSpeed / currentSpeed;
+    p.x += p.vx * dt; p.y += p.vy * dt;
+    p.r += adjustedSpeed * dt;
+  }
+
+  function updateRocketHeading(item, dt, alignment) {
+    if (item.px == null) return;
+    const dx = vp.x - item.px, dy = vp.y - item.py, len = Math.hypot(dx, dy) || 1;
+    const radial = { x: dx / len, y: dy / len };
+    const tangent = { x: -Math.sin(item.angle), y: Math.cos(item.angle) };
+    const lean = clamp((item.angularVel || 0) * 6, -.3, .3);
+    const cruiseHeading = Math.atan2(radial.y + tangent.y * lean, radial.x + tangent.x * lean);
+    const waypointHeading = Math.atan2(radial.y, radial.x);
+    // At warp peak, every settled craft tucks into the exact live waypoint
+    // bearing. The shortest-angle blend stays clean during a gate sweep.
+    const desired = cruiseHeading + angleDelta(cruiseHeading, waypointHeading) * alignment;
+    if (item.heading == null) { item.heading = desired; item.roll = 0; return; }
+    const response = reduced ? 3 : 7 + alignment * 9;
+    const headingStep = angleDelta(item.heading, desired) * Math.min(1, dt * response);
+    item.heading += headingStep;
+
+    // Banking follows the displayed steering direction, not a change in
+    // orbital speed. A held curve, reversal, or waypoint sweep can therefore
+    // all read as a deliberate left/right bank.
+    const turnRate = headingStep / Math.max(dt, .001);
+    const maxBank = reduced ? Math.PI / 30 : Math.PI / 9;
+    const targetRoll = clamp(turnRate * .8, -maxBank, maxBank) * (1 - alignment);
+    const bankResponse = reduced ? 3 : 7;
+    item.roll += (targetRoll - item.roll) * Math.min(1, dt * bankResponse);
+  }
+
+  function applySeparation(group, dt) {
+    const sorted = group.slice().sort((a, b) => norm(a.angle) - norm(b.angle));
+    const n = sorted.length;
+    for (let i = 0; i < n; i++) {
+      const a = sorted[i], b = sorted[(i + 1) % n];
+      let gap = norm(b.angle) - norm(a.angle);
+      if (gap < 0) gap += TWO_PI;
+      // Sized to each rocket's actual footprint at its orbital radius (an
+      // angular-width approximation), not a fixed aesthetic spacing — this
+      // only steps in to stop genuine sprite overlap, so the pack clusters
+      // and scatters unevenly rather than snapping toward a perfectly even
+      // ring. Positions read as random, not neatly fanned out.
+      const radius = Math.max(30, radiusFrac(a.dCurrent) * Math.min(W, H) * .5);
+      const footprint = Math.min(W, H) * .15 * sizeFrac(a.dCurrent);
+      const minGap = clamp((footprint * 1.1) / radius, .015, .24);
+      if (gap > 0 && gap < minGap) {
+        const push = (minGap - gap) * .5;
+        a.angle -= push * dt * 6; b.angle += push * dt * 6;
+      }
+    }
+  }
+  function norm(a) { a = a % TWO_PI; return a < 0 ? a + TWO_PI : a; }
+
+  // ---------- arrivals ----------
+  const LAUNCH_DUR = reduced ? 2.2 : 4.2;
+  // The gate wanders continuously (see the wandering-gate section above), so
+  // a launch's start/hitch/final points can never be computed once and
+  // frozen — over a ~4s flight the live gate visibly drifts away from that
+  // snapshot, and the rocket would snap sideways to reconcile the instant
+  // the launch handed off to normal orbit rendering. launchGeometry is
+  // called fresh every frame from the CURRENT vp instead, so the whole
+  // trajectory glides along with the gate exactly as settled orbit does.
+  function launchGeometry(ring, angle) {
+    const finalPoint = depthPoint(ring, angle, ringFor(Math.max(0, Math.min(rockets.length, maxRockets) - 1)));
+    const dx = finalPoint.x - vp.x, dy = finalPoint.y - vp.y, len = Math.hypot(dx, dy) || 1, ux = dx / len, uy = dy / len;
+    // Bursts out of the gate itself (a small fixed clearance past the gate
+    // glyph), then holds its oversized hitch at a generous, mostly-fixed
+    // distance so it never overlaps the horizon point — only clamped down
+    // for a final slot that's genuinely close in (an early or inner-ring
+    // rocket), and never past the final slot itself.
+    const gateStart = { x: vp.x + ux * 26, y: vp.y + uy * 26 };
+    const hitchDist = Math.min(len * .97, Math.max(len * .7, Math.min(W, H) * .24));
+    const hitch = { x: vp.x + ux * hitchDist, y: vp.y + uy * hitchDist };
+    return { finalPoint, gateStart, hitch };
+  }
+  function startPending(t, displayRecords) {
+    while (activeLaunches.length < 3 && launchQueue.length && t - lastLaunch >= 1.5) {
+      const item = launchQueue.shift(); item.queued = false;
+      const i = displayRecords.indexOf(item.record);
+      if (i < 0) { item.visible = true; continue; }
+      const ring = ringFor(i);
+      item.ring = ring; item.ageIndex = i;
+      const angle = slotAngleSeed(ring, i);
+      item.angle = angle;
+      const { finalPoint } = launchGeometry(ring, angle);
+      item.launch = { t0: t, ring, angle };
+      item.visible = true; item.dCurrent = finalPoint.d; item.dTarget = finalPoint.d;
+      activeLaunches.push(item); lastLaunch = t;
+      triggerWarpBurst(t); triggerBank(t);
+      tempoTarget = 1;
+      showBanner(item.record.childName, item.record.rocketName, 'just joined the rally', LAUNCH_DUR + .3);
+      if (soundOn) playLaunchSfx();
+    }
+  }
+
+  function launchPosition(item, t) {
+    const l = item.launch;
+    const { finalPoint, gateStart, hitch } = launchGeometry(l.ring, l.angle);
+    const p = clamp((t - l.t0) / LAUNCH_DUR, 0, 1);
+    let x, y, size01, reveal = 1;
+    if (p < .40) {
+      const e = easeInOutCubic(p / .40);
+      x = gateStart.x + (hitch.x - gateStart.x) * e; y = gateStart.y + (hitch.y - gateStart.y) * e;
+      // Grows from nothing rather than popping in part-formed — a genuine
+      // materialize-at-the-gate rather than a rocket that's already 28% built
+      // the instant it appears.
+      reveal = e; size01 = 1.63 * reveal;
+    } else if (p < .68) {
+      const hitchP = (p - .40) / .28;
+      const bob = Math.pow(Math.sin(hitchP * Math.PI), 2) * 6;
+      const dx = hitch.x - vp.x, dy = hitch.y - vp.y, len = Math.hypot(dx, dy) || 1;
+      x = hitch.x - (dy / len) * bob; y = hitch.y + (dx / len) * bob;
+      size01 = 1.63;
+    } else {
+      const e = easeInOutCubic((p - .68) / .32);
+      x = hitch.x + (finalPoint.x - hitch.x) * e; y = hitch.y + (finalPoint.y - hitch.y) * e;
+      size01 = 1.63 - .63 * e;
+    }
+    if (p >= 1) {
+      item.launch = null;
+      // Launching skips steering updates, so restart its heading and bank from
+      // the settled position instead of carrying a pre-launch turn forward.
+      item.roll = 0; item.vx = 0; item.vy = 0; item.heading = null;
+      item.dCurrent = finalPoint.d; item.dTarget = finalPoint.d;
+      // Seed the seek position at exactly where the launch animation left
+      // off, so orbit rendering picks up from here instead of the rocket's
+      // stale pre-launch spot (relevant when a settled rocket gets
+      // relaunched, e.g. the demo's periodic pulses).
+      item.px = finalPoint.x; item.py = finalPoint.y;
+      activeLaunches = activeLaunches.filter(v => v !== item);
+    }
+    return { x, y, size01, reveal, progress: p, finalD: finalPoint.d };
+  }
+
+  // ---------- background ----------
+  function drawSkyHaze(x, y, radius, color, strength) {
+    const haze = bctx.createRadialGradient(x, y, 0, x, y, radius);
+    haze.addColorStop(0, hexAlpha(color, strength));
+    haze.addColorStop(.42, hexAlpha(color, strength * .28));
+    haze.addColorStop(1, hexAlpha(color, 0));
+    bctx.fillStyle = haze; bctx.fillRect(0, 0, W, H);
+  }
+
+  function drawDeepSky(dt) {
+    if (!deepSkyLayers.length) return;
+    const extent = Math.max(W, H);
+    const motion = reduced ? .18 : 1;
+    const offsetX = vp.x - W * .5, offsetY = vp.y - H * .5;
+    bctx.save();
+    for (const layer of deepSkyLayers) {
+      layer.angle += dt * layer.drift * motion;
+      bctx.globalAlpha = layer.opacity;
+      bctx.save();
+      bctx.translate(W * .5 + offsetX * layer.parallax, H * .5 + offsetY * layer.parallax);
+      bctx.rotate(layer.angle);
+      const size = extent * layer.scale;
+      bctx.drawImage(layer.canvas, -size / 2, -size / 2, size, size);
+      bctx.restore();
+    }
+    bctx.restore();
+  }
+  function drawNebula(t, dt) {
+    if (!nebulaGasLayers.length || !nebulaDust) return;
+    // A launch's warp burst drives the camera through the cloud field. Two
+    // scaled passes crossfade as depth wraps, so the gas keeps advancing
+    // instead of springing back when the boost ends. Boost only feeds the
+    // travel accumulator — never a transient scale/offset term — so the
+    // clouds hold their ground and merely slow down once the boost is over:
+    // the fleet is flying, not the scenery breathing.
+    // The clouds never sit still: a nonzero baseline travel rate keeps the
+    // fleet drifting through the gas field at cruising speed, and a boost
+    // simply pours on more speed on top.
+    const boost = clamp((warp - 1) / 7, 0, 1);
+    nebulaTravel = (nebulaTravel + dt * (reduced ? .003 : .02 + boost * .42 + tempo * .035)) % 1;
+    const phase = nebulaTravel;
+    const dx = reduced ? 0 : Math.sin(t * .045) * W * .012;
+    const dy = reduced ? 0 : Math.sin(t * .038 + 1) * H * .012;
+    const colorPosition = reduced ? 0 : (t / 24) % NEBULA_PALETTES.length;
+    const paletteIndex = Math.floor(colorPosition), nextPaletteIndex = (paletteIndex + 1) % NEBULA_PALETTES.length;
+    const paletteMix = easeInOutCubic(colorPosition - paletteIndex);
+    // Scenery slides opposite the heading: with the gate off to the left the
+    // clouds drift right, gate high they drift down, and a centred gate
+    // means pure outward expansion (flying straight at the waypoint) with no
+    // sideways slide at all.
+    const driftX = (W * .5 - vp.x) * 1.5, driftY = (H * .5 - vp.y) * 1.5;
+    bctx.save();
+    const pass = (scale, opacity, travel) => {
+      if (opacity <= 0) return;
+      const width = W * scale, height = H * scale;
+      const x = vp.x * (1 - scale) + dx + travel * driftX;
+      const y = vp.y * (1 - scale) + dy + travel * driftY;
+      bctx.globalCompositeOperation = 'screen';
+      bctx.globalAlpha = opacity * (1 - paletteMix);
+      bctx.drawImage(nebulaGasLayers[paletteIndex], x, y, width, height);
+      if (paletteMix > 0) {
+        bctx.globalAlpha = opacity * paletteMix;
+        bctx.drawImage(nebulaGasLayers[nextPaletteIndex], x, y, width, height);
+      }
+      bctx.globalCompositeOperation = 'source-over';
+      bctx.globalAlpha = opacity;
+      bctx.drawImage(nebulaDust, x, y, width, height);
+    };
+    pass(1.12 + phase * .42, 1 - phase, phase);
+    pass(.70 + phase * .42, phase, phase - 1);
+    bctx.restore();
+  }
+
+  function drawBackground(t, dt, bankFlare) {
+    const speed = reduced ? 1 + (warp - 1) * .22 : warp;
+    const extent = Math.max(W, H);
+    const grad = bctx.createRadialGradient(vp.x, vp.y, 0, vp.x, vp.y, extent * .88);
+    grad.addColorStop(0, '#282050'); grad.addColorStop(.18, '#18143b'); grad.addColorStop(.58, '#0b0b25'); grad.addColorStop(1, PALETTE.deep);
+    bctx.fillStyle = grad; bctx.fillRect(0, 0, W, H);
+    // Broad, offset colour pools deepen the void without introducing a line,
+    // horizon, or other shape that can compete with the fleet's motion.
+    const driftX = vp.x - W * .5, driftY = vp.y - H * .5;
+    drawSkyHaze(W * .22 + driftX * .08, H * .24 + driftY * .05, extent * .56, PALETTE.violet, .12);
+    drawSkyHaze(W * .76 + driftX * .13, H * .67 + driftY * .09, extent * .48, PALETTE.ion, .055);
+    drawDeepSky(dt);
+    drawNebula(t, dt);
+    // The view recedes into a dark horizon: space becomes progressively
+    // less lit near the gate.
+    const horizonShade = bctx.createRadialGradient(vp.x, vp.y, 0, vp.x, vp.y, extent * .34);
+    horizonShade.addColorStop(0, 'rgba(1,1,10,.86)');
+    horizonShade.addColorStop(.16, 'rgba(1,1,10,.66)');
+    horizonShade.addColorStop(.5, 'rgba(2,3,14,.25)');
+    horizonShade.addColorStop(1, 'rgba(2,3,14,0)');
+    bctx.fillStyle = horizonShade; bctx.fillRect(0, 0, W, H);
+    const vignette = bctx.createRadialGradient(W * .5, H * .5, extent * .18, W * .5, H * .5, extent * .78);
+    vignette.addColorStop(0, 'rgba(5,4,24,0)'); vignette.addColorStop(1, 'rgba(5,4,24,.48)');
+    bctx.fillStyle = vignette; bctx.fillRect(0, 0, W, H);
+
+    // dust motes
+    bctx.save();
+    for (const d of dust) {
+      const curl = d.curl * (1 + (bankFlare || 0) * 2);
+      d.vx += -d.vy * curl * dt; d.vy += d.vx * curl * dt;
+      stepEmitted(d, dt, speed, (14 + d.r * .3) * speed * d.z * .8, 8, 28);
+      if (d.r > Math.max(W, H) * .9) Object.assign(d, freshDust(Math.random()));
+      bctx.globalAlpha = .18 + d.z * .22;
+      bctx.fillStyle = PALETTE.ember;
+      bctx.beginPath(); bctx.arc(d.x, d.y, .8 + d.z * 1.4, 0, TWO_PI); bctx.fill();
+    }
+    bctx.restore();
+
+    // star streaks
+    const whiteMix = clamp((warp - 1) / 7, 0, 1);
+    let streamStrength = 0;
+    const streamPeak = reduced ? 1.2 : 8;
+    for (const burst of warpBursts) {
+      const contribution = burstEnvelope(t - burst.t0, streamPeak, reduced ? 0 : -.15);
+      if (contribution != null) streamStrength = Math.max(streamStrength, clamp(contribution / streamPeak, 0, 1));
+    }
+    bctx.save();
+    for (const particle of particles) {
+      const previousX = particle.x, previousY = particle.y;
+      stepEmitted(particle, dt, speed, (24 + particle.r * .38) * speed * particle.z, 15, 55);
+      if (particle.r > Math.max(W, H) * .95) Object.assign(particle, freshParticle(Math.random()));
+      if (streamStrength <= 0) continue;
+      bctx.globalAlpha = (.25 + particle.z * .6) * streamStrength;
+      bctx.strokeStyle = whiteMix > 0 ? lerpColor(particle.h, '#ffffff', whiteMix * .8) : particle.h;
+      bctx.lineWidth = Math.max(.7, particle.z * 1.7 * (1 + whiteMix * 1.6));
+      bctx.beginPath(); bctx.moveTo(previousX, previousY); bctx.lineTo(particle.x, particle.y); bctx.stroke();
+    }
+    bctx.restore();
+
+    updateSparks(t, dt);
+
+    // Shockwaves stay at the gate position where they were emitted; the live
+    // beacon below is the only effect that follows a moving waypoint.
+    bctx.save(); bctx.globalCompositeOperation = 'lighter';
+    for (const burst of warpBursts) {
+      const contribution = burstEnvelope(t - burst.t0, reduced ? 1.2 : 8, reduced ? 0 : -.15);
+      if (contribution == null || contribution <= 1.4) continue;
+      const p = clamp((contribution - 1) / 7, 0, 1);
+      bctx.save(); bctx.translate(burst.x, burst.y);
+      bctx.strokeStyle = `rgba(255,255,255,${.35 * p})`; bctx.lineWidth = 2 + p * 3;
+      bctx.beginPath(); bctx.arc(0, 0, Math.max(W, H) * .15 * p, 0, TWO_PI); bctx.stroke();
+      bctx.restore();
+    }
+    bctx.restore();
+
+    // gate
+    bctx.save(); bctx.translate(vp.x, vp.y);
+    if (warp > 1.4) {
+      const flareR = 10 + (warp - 1) * 9;
+      const fg = bctx.createRadialGradient(0, 0, 0, 0, 0, flareR);
+      fg.addColorStop(0, 'rgba(255,255,255,.9)'); fg.addColorStop(1, 'rgba(255,255,255,0)');
+      bctx.fillStyle = fg; bctx.beginPath(); bctx.arc(0, 0, flareR, 0, TWO_PI); bctx.fill();
+    }
+    // A starting-gate marker, not a target ring: two flanking brackets frame
+    // the beacon like a portal the fleet launches through, rather than a
+    // closed circle everything visibly aims at.
+    const gateSize = 13 + (Math.sin(t * 3) + 1) * 2;
+    bctx.strokeStyle = PALETTE.ember; bctx.globalAlpha = .65 + (warp - 1) * .1;
+    bctx.lineWidth = 2.2 + (warp - 1) * 1.4; bctx.lineCap = 'round'; bctx.lineJoin = 'round';
+    for (const side of [-1, 1]) {
+      bctx.beginPath();
+      bctx.moveTo(side * gateSize * 1.7, -gateSize * .95);
+      bctx.lineTo(side * gateSize * .6, 0);
+      bctx.lineTo(side * gateSize * 1.7, gateSize * .95);
+      bctx.stroke();
+    }
+    bctx.fillStyle = PALETTE.paper; bctx.beginPath(); bctx.arc(0, 0, 4 + (warp - 1) * 1.6, 0, TWO_PI); bctx.fill();
+    bctx.restore();
+  }
+  function lerpColor(hex, hex2, t) {
+    const a = parseInt(hex.slice(1), 16), b = parseInt(hex2.slice(1), 16);
+    const ar = (a >> 16) & 255, ag = (a >> 8) & 255, ab = a & 255;
+    const br = (b >> 16) & 255, bg = (b >> 8) & 255, bb = b & 255;
+    const r = Math.round(ar + (br - ar) * t), g = Math.round(ag + (bg - ag) * t), bl = Math.round(ab + (bb - ab) * t);
+    return `rgb(${r},${g},${bl})`;
+  }
+
+  // ---------- fleet rendering ----------
+  function positionOf(item, t) {
+    if (item.launch) {
+      const lp = launchPosition(item, t);
+      // size01 is a multiplier on the rocket's own settled (post-launch) size,
+      // not a fixed baseline, so the very last launch frame renders at exactly
+      // the size normal orbit rendering will use next frame — no handoff pop.
+      const settleSize = Math.max(18, Math.min(W, H) * .15 * sizeFrac(lp.finalD)) * rocketScale;
+      const size = settleSize * lp.size01;
+      const dx = lp.x - vp.x, dy = lp.y - vp.y;
+      // Nose points along the burst for the first half of the flight — out
+      // of the gate, in the direction of travel — then banks smoothly
+      // through a 180° turn over the back half so it's already facing the
+      // waypoint (the steady-state heading, see positionOf below) by the
+      // moment it settles. Turning the same way the rocket is about to
+      // orbit reads as peeling off and banking into formation, rather than
+      // flying the whole approach nose-first-toward-the-gate or snapping to
+      // face the waypoint the instant the launch hands off.
+      const turnP = clamp((lp.progress - .55) / .45, 0, 1);
+      const swing = easeInOutCubic(turnP) * Math.PI * (item.spin || 1);
+      const c = Math.cos(swing), s = Math.sin(swing);
+      const headingAngle = Math.atan2(dx * s + dy * c, dx * c - dy * s);
+      return { x: lp.x, y: lp.y, size, launching: true, reveal: lp.reveal, progress: lp.progress, headingAngle, roll: 0 };
+    }
+    const d = item.dCurrent;
+    // x/y are eased state from seekPosition (updateFleet) rather than
+    // recomputed straight from vp here, so the fleet visibly travels toward
+    // a moved waypoint instead of being carried by it — see seekPosition.
+    const x = item.px != null ? item.px : vp.x + Math.cos(item.angle) * radiusFrac(d) * W * .56;
+    const y = item.py != null ? item.py : vp.y + Math.sin(item.angle) * radiusFrac(d) * H * .42;
+    const size = Math.max(18, Math.min(W, H) * .15 * sizeFrac(d)) * rocketScale;
+    // Nose points at the waypoint — the direction the track heads next —
+    // leaning slightly into the turn so cornering reads as banking rather
+    // than every ship aiming identically dead-on. The desired bearing uses
+    // the rocket's actual world position, while updateRocketHeading eases the
+    // turn so the waypoint visibly leads the response.
+    const headingAngle = item.heading == null ? Math.atan2(vp.y - y, vp.x - x) : item.heading;
+    return { x, y, size, launching: false, headingAngle, roll: item.roll, d };
+  }
+
+  function engineWorldPoints(item, pos, rotation, bodyWidthScale, bodySkew) {
+    const tpl = ROCKET_TEMPLATES[item.record.templateId] || ROCKET_TEMPLATES.classic;
+    const engines = tpl.engines && tpl.engines.length ? tpl.engines : [[.5, .9]];
+    const img = item.img;
+    const ratio = img && img.naturalWidth ? img.naturalHeight / img.naturalWidth : 1.45;
+    const width = pos.size, height = width * ratio;
+    const cos = Math.cos(rotation), sin = Math.sin(rotation);
+    return engines.map(([ex, ey]) => {
+      // Match the projected body pose applied in drawRocket: narrowing the
+      // silhouette and shearing it slightly reads like a wing rolling in 3D.
+      const lx = (ex - .5) * width * bodyWidthScale;
+      const ly = (ey - .5) * height + lx * bodySkew;
+      return { x: pos.x + lx * cos - ly * sin, y: pos.y + lx * sin + ly * cos };
+    });
+  }
+
+  function trail(item, pos, t, rotation, bodyWidthScale, bodySkew) {
+    const tpl = ROCKET_TEMPLATES[item.record.templateId] || ROCKET_TEMPLATES.classic;
+    const flame = tpl.flame || [PALETTE.paper, PALETTE.ion];
+    const points = engineWorldPoints(item, pos, rotation, bodyWidthScale, bodySkew);
+    const speedProxy = pos.launching ? 1.4 : Math.min(2.2, Math.abs(item.angularVel || 0) * 9);
+    const power = (pos.launching ? warp * 1.7 : warp) * (0.55 + speedProxy * .6);
+    // Out the back, parallel to the body axis (the sprite's own rotation),
+    // not the radial vector from the gate — those only coincide when roll
+    // and the turn-lean are exactly zero, so the flame used to visibly peel
+    // away from the nozzle whenever a rocket banked.
+    const tailX = -Math.sin(rotation), tailY = Math.cos(rotation);
+    const perpX = -tailY, perpY = tailX;
+    const length = (18 + pos.size * .55) * power * (reduced ? .35 : 1);
+    // A packed fleet (a busy carnival day, or the 300-rocket stress test)
+    // skips the per-frame gradient allocation and the wobble curve for a
+    // flat, cheap stroke instead — one canvas gradient object per engine
+    // per rocket per frame is the single most expensive thing this scene
+    // does, and it's not worth its cost once there are hundreds of them.
+    const lod = Math.min(rockets.length, maxRockets) > 120;
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    ctx.lineWidth = Math.max(1.6, pos.size * .09); ctx.lineCap = 'round';
+    let engineIndex = 0;
+    for (const pt of points) {
+      const endX = pt.x + tailX * length, endY = pt.y + tailY * length;
+      if (lod) {
+        // No gradient object (the expensive part) — three flat-colour
+        // segments stepping down in alpha reads as a fade at a fraction of
+        // the cost, so the flame still visibly dies out toward its tip
+        // rather than cutting off with a hard edge.
+        for (let step = 0; step < 3; step++) {
+          const p0 = step / 3, p1 = (step + 1) / 3;
+          ctx.strokeStyle = hexAlpha(flame[step === 0 ? 0 : 1], .62 * (1 - step * .36));
+          ctx.beginPath();
+          ctx.moveTo(pt.x + (endX - pt.x) * p0, pt.y + (endY - pt.y) * p0);
+          ctx.lineTo(pt.x + (endX - pt.x) * p1, pt.y + (endY - pt.y) * p1);
+          ctx.stroke();
+        }
+      } else {
+        // A gentle perpendicular waver along the flame's own length — an
+        // organic flicker rather than a ruler-straight beam — phased per
+        // rocket and per engine so a multi-engine ship doesn't flutter in
+        // unison.
+        const wobble = reduced ? 0 : Math.sin(t * 10 + item.phase * 3 + engineIndex * 2.1) * length * .1;
+        const midX = pt.x + tailX * length * .48 + perpX * wobble, midY = pt.y + tailY * length * .48 + perpY * wobble;
+        const g = ctx.createLinearGradient(pt.x, pt.y, endX, endY);
+        g.addColorStop(0, hexAlpha(flame[0], .95)); g.addColorStop(.4, hexAlpha(flame[1], .65)); g.addColorStop(1, hexAlpha(flame[1], 0));
+        ctx.strokeStyle = g;
+        ctx.beginPath(); ctx.moveTo(pt.x, pt.y); ctx.quadraticCurveTo(midX, midY, endX, endY); ctx.stroke();
+      }
+      engineIndex++;
+    }
+    ctx.restore();
+  }
+
+  function drawMote(item, pos) {
+    const tpl = ROCKET_TEMPLATES[item.record.templateId] || ROCKET_TEMPLATES.classic;
+    const color = (tpl.flame && tpl.flame[1]) || PALETTE.ion;
+    ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = .8;
+    ctx.fillStyle = color;
+    ctx.beginPath(); ctx.arc(pos.x, pos.y, Math.max(1, pos.size * .5), 0, TWO_PI); ctx.fill();
+    ctx.restore();
+  }
+
+  function drawRocket(item, t, spotlight) {
+    if (!item.visible || item.queued) return;
+    const pos = positionOf(item, t);
+    // The launch ship keeps its bespoke gate-to-lane turn. Settled ships lose
+    // their independent bank and idle wobble as the burst tucks the fleet
+    // toward the live waypoint.
+    const independentMotion = pos.launching ? 1 : 1 - burstAlign;
+    const wobble = reduced ? 0 : Math.sin(t * .9 + item.phase) * .015 * independentMotion;
+    const rotation = pos.headingAngle + Math.PI / 2 + pos.roll * independentMotion + wobble;
+    // A photographed rocket cannot truly roll in 3D, so project that turn as
+    // a quick wing-like close/open: its width narrows, then a small shear
+    // carries the silhouette across its centreline. It is most visible in a
+    // warp burst and follows the strength of ordinary steering banks.
+    const bankLimit = reduced ? Math.PI / 30 : Math.PI / 9;
+    const bankStrength = pos.launching ? .35 : clamp(Math.abs(pos.roll) / bankLimit, 0, 1);
+    const bodyStrength = Math.max(burstAlign, bankStrength);
+    const flutterRate = reduced ? 3.5 : 5.5 + bodyStrength * 3;
+    const bodyWave = Math.sin(t * flutterRate + item.phase * 2.7);
+    const bodyClose = (bodyWave + 1) * .5;
+    const bodyWidthScale = 1 - (reduced ? .06 : .24) * bodyStrength * bodyClose;
+    const bodySkew = (reduced ? .035 : .12) * bodyStrength * bodyWave;
+    trail(item, pos, t, rotation, bodyWidthScale, bodySkew);
+    if (pos.size / rocketScale < 12 && !pos.launching) { drawMote(item, pos); return; }
+    const img = item.img;
+    ctx.save(); ctx.translate(pos.x, pos.y);
+    if (spotlight) {
+      // The beacon stays outside the sprite silhouette, so its signal remains
+      // clear across the room without looking like a selection outline.
+      const beaconPhase = item.phase + (reduced ? 0 : t * 1.7);
+      const beaconR = Math.max(24, pos.size * 1.35);
+      const pulse = reduced ? .9 : .78 + Math.sin(t * 4.2 + item.phase) * .22;
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.strokeStyle = hexAlpha(PALETTE.ember, .9 * pulse);
+      ctx.lineWidth = Math.max(2, pos.size * .055);
+      ctx.lineCap = 'round';
+      ctx.shadowColor = hexAlpha(PALETTE.ember, .9); ctx.shadowBlur = 12;
+      for (let i = 0; i < 4; i++) {
+        const a = beaconPhase + i * Math.PI / 2;
+        const start = beaconR * .69, end = beaconR * (.89 + pulse * .06);
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(a) * start, Math.sin(a) * start);
+        ctx.lineTo(Math.cos(a) * end, Math.sin(a) * end);
+        ctx.stroke();
+      }
+      for (let i = 0; i < 3; i++) {
+        const a = beaconPhase + i * TWO_PI / 3;
+        ctx.beginPath();
+        ctx.arc(0, 0, beaconR + (i - 1) * pos.size * .055, a + .10, a + .82);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+    ctx.rotate(rotation);
+    ctx.transform(1, bodySkew, 0, 1, 0, 0);
+    ctx.scale(bodyWidthScale, 1);
+    const ratio = img && img.naturalWidth ? img.naturalHeight / img.naturalWidth : 1.45;
+    const width = pos.size * (spotlight ? 1.22 : 1), height = width * ratio;
+    ctx.globalAlpha = pos.launching ? pos.reveal : 1;
+    // shadowBlur is one of the costliest canvas operations there is, and a
+    // packed fleet would otherwise pay it for every rocket every frame.
+    if (Math.min(rockets.length, maxRockets) <= 120 || spotlight) {
+      ctx.shadowColor = 'rgba(0,0,0,.5)'; ctx.shadowBlur = spotlight ? 20 : 8; ctx.shadowOffsetY = 5;
+    }
+    if (img) ctx.drawImage(img, -width / 2, -height / 2, width, height);
+    else { ctx.fillStyle = PALETTE.flare; ctx.beginPath(); ctx.moveTo(0, -height / 2); ctx.lineTo(width / 2, height / 2); ctx.lineTo(-width / 2, height / 2); ctx.closePath(); ctx.fill(); }
+    ctx.restore();
+  }
+
+  // ---------- spotlight (an old rocket surges back through the pack) ----------
+  function maybeSpotlight(t, displayRecords) {
+    if (activeLaunches.length || displayRecords.length < 2 || t < spotlightAt) return null;
+    spotlightAt = t + 9;
+    const idx = Math.floor(Math.random() * displayRecords.length);
+    const record = displayRecords[idx];
+    const item = runtime.get(record.id);
+    if (!item || item.launch || item.queued) return null;
+    item.spotlightUntil = t + 5;
+    item.overtakeUntil = t + 5.2; item.overtakeStrength = 2.1;
+    showBanner(record.childName, record.rocketName, 'in the spotlight', 4.2);
+    spotlightItem = record.id;
+    return record.id;
+  }
+
+  // ---------- frame loop ----------
+  function frame(now) {
+    const t = now / 1000, dt = Math.min(.05, t - then); then = t;
+    const displayRecords = rockets.slice(-maxRockets);
+    activeLaunches = activeLaunches.filter(item => {
+      if (displayRecords.includes(item.record)) return true;
+      item.launch = null; item.visible = true; item.px = null; item.py = null;
+      return false;
+    });
+    if (demo && displayRecords.length && t >= demoPulseAt) {
+      const item = runtime.get(displayRecords[Math.floor(Math.random() * displayRecords.length)].id);
+      if (item && !item.launch && !item.queued) { item.visible = false; item.queued = true; launchQueue.push(item); }
+      demoPulseAt = t + 5;
+    }
+    updateVanishingPoint(t, dt);
+    startPending(t, displayRecords);
+    updateWarp(t);
+    tempoTarget = activeLaunches.length ? 1 : Math.max(0, tempoTarget - dt * .12);
+    tempo += (tempoTarget - tempo) * Math.min(1, dt * 1.6);
+    const bankFlare = updateFleet(t, dt, tempo * (.4 + scrambleBalance * .8), displayRecords);
+    if (!activeLaunches.length && t - lastBank > 13 + (1 - scrambleBalance) * 10) triggerBank(t);
+
+    drawBackground(t, dt, bankFlare);
+    ctx.clearRect(0, 0, W, H);
+
+    if (spotlightItem && !runtime.has(spotlightItem)) spotlightItem = null;
+    if (!spotlightItem || (runtime.get(spotlightItem) && t > runtime.get(spotlightItem).spotlightUntil)) {
+      if (spotlightItem) spotlightItem = null;
+      maybeSpotlight(t, displayRecords);
+    }
+
+    const drawList = displayRecords.map(r => runtime.get(r.id)).filter(item => item && item.visible && !item.queued);
+    // Active launches get a temporary top render layer so the launch reads
+    // above the whole fleet, even when its eventual ring is an inner one.
+    // Once launchPosition settles it, normal depth movement resumes. Among
+    // settled rockets, the newest one wins when two occupy the same depth.
+    drawList.sort((a, b) => Number(!!a.launch) - Number(!!b.launch) || a.dCurrent - b.dCurrent || a.ageIndex - b.ageIndex);
+    for (const item of drawList) drawRocket(item, t, item.record.id === spotlightItem);
+
+    if (bannerTimer && t > bannerTimer) { banner.classList.remove('show'); bannerTimer = 0; }
+    if (toastTimer && t > toastTimer) { toast.classList.remove('show'); toastTimer = 0; }
+    requestAnimationFrame(frame);
+  }
+
+  // ---------- panel / recent list ----------
+  function renderRecent() {
+    const list = document.getElementById('recent'); list.textContent = '';
+    const latest = [...rockets].slice(-20).reverse();
+    document.getElementById('recentTally').textContent = rockets.length ? `${latest.length}/${rockets.length}` : '';
+    latest.forEach(record => {
+      const row = document.createElement('div'); row.className = 'rocketRow';
+      const text = document.createElement('span');
+      const rocketName = publicName(record.rocketName), pilotName = publicName(record.childName);
+      text.textContent = rocketName && pilotName ? `${rocketName} — ${pilotName}` : rocketName || pilotName || `Rocket #${String(record.id).slice(-6)}`;
+      const remove = document.createElement('button'); remove.textContent = 'Remove';
+      armConfirm(remove, 'Sure?', () => removeOne(record.id));
+      row.append(text, remove); list.append(row);
+    });
+  }
+  async function removeOne(id) {
+    try {
+      if (location.protocol === 'file:') { await RocketStore.remove(id); const bc = new BroadcastChannel(ROCKET_SYNC_CHANNEL); bc.postMessage({ type: 'remove-rocket', id }); bc.close(); removeRocket(id); }
+      else { const res = await fetch('/api/rockets/' + encodeURIComponent(id), { method: 'DELETE' }); if (!res.ok) throw new Error(); }
+    } catch (_) { showToast('Could not remove that rocket.'); }
+  }
+  async function clearAll() {
+    try {
+      if (location.protocol === 'file:') { await RocketStore.clear(); const bc = new BroadcastChannel(ROCKET_SYNC_CHANNEL); bc.postMessage({ type: 'clear' }); bc.close(); clearRockets(); }
+      else { const res = await fetch('/api/rockets', { method: 'DELETE' }); if (!res.ok) throw new Error(); }
+    } catch (_) { showToast('Could not clear the fleet.'); }
+  }
+  function exportFleet() {
+    const data = JSON.stringify({ version: 1, exportedAt: new Date().toISOString(), rockets }, null, 2);
+    const url = URL.createObjectURL(new Blob([data], { type: 'application/json' }));
+    const link = document.createElement('a'); link.href = url; link.download = `rocket-rally-${new Date().toISOString().slice(0, 10)}.json`; link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 500);
+  }
+  async function importFleet(file) {
+    try {
+      const data = JSON.parse(await file.text()), records = Array.isArray(data) ? data : data.rockets;
+      if (!Array.isArray(records)) throw new Error();
+      const safe = records.filter(r => r && typeof r.imageDataURL === 'string' && ROCKET_TEMPLATES[r.templateId] &&
+        (r.childName == null || typeof r.childName === 'string') && (r.rocketName == null || typeof r.rocketName === 'string'))
+        .map(r => ({ ...r, childName: typeof r.childName === 'string' ? r.childName.trim() : '', rocketName: typeof r.rocketName === 'string' ? r.rocketName.trim() : '' }));
+      if (!safe.length) throw new Error();
+      if (location.protocol === 'file:') { for (const r of safe) { if (!r.id) r.id = rocketId(); await RocketStore.put(r); await addRocket(r, false); } }
+      else { const res = await fetch('/api/rockets/import', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rockets: safe }) }); if (!res.ok) throw new Error(); }
+      showToast(`${safe.length} rocket(s) restored.`);
+    } catch (_) { showToast('That file is not a valid Rocket Rally export.'); }
+  }
+
+  // ---------- join code ----------
+  let joinCodeRequestId = 0;
+  const qrSourceSelect = document.getElementById('qrSource');
+  const qrCustomRow = document.getElementById('qrCustomRow');
+  const qrCustomUrl = document.getElementById('qrCustomUrl');
+  // The upload page isn't reachable from another device when opened from file://.
+  qrSourceSelect.querySelector('[value="auto"]').disabled = location.protocol === 'file:';
+  qrSourceSelect.value = location.protocol === 'file:' ? 'custom' : 'auto';
+  try {
+    if (localStorage.getItem('rocket-rally-qr-source') === 'custom') qrSourceSelect.value = 'custom';
+    qrCustomUrl.value = localStorage.getItem('rocket-rally-qr-url') || '';
+  } catch (_) {}
+  function isLoopbackHost(hostname) {
+    const host = hostname.toLowerCase().replace(/^\[|\]$/g, '');
+    return host === 'localhost' || host.endsWith('.localhost') || host === '::' || host === '::1' || host === '0.0.0.0' || host.startsWith('127.');
+  }
+  function uploadPath() {
+    return location.pathname.replace(/display(-test)?\.html$/, 'upload.html');
+  }
+  async function joinUploadUrl() {
+    try {
+      const response = await fetch('/api/host-info');
+      if (!response.ok) throw new Error('Host info request failed.');
+      const info = await response.json();
+      const port = Number(info.port);
+      const ip = typeof info.ip === 'string' ? info.ip.trim() : '';
+      const octets = ip.split('.');
+      if (octets.length !== 4 || octets.some(part => !/^\d{1,3}$/.test(part) || Number(part) > 255) ||
+          !Number.isInteger(port) || port < 1 || port > 65535) {
+        throw new Error('Invalid host info.');
+      }
+      const hostUrl = new URL(`http://${ip}:${port}/`);
+      if (hostUrl.username || hostUrl.password || hostUrl.pathname !== '/' || isLoopbackHost(hostUrl.hostname)) {
+        throw new Error('Host info is not reachable from another device.');
+      }
+      return `http://${hostUrl.host}${uploadPath()}`;
+    } catch (error) {
+      const currentOrigin = new URL(location.origin);
+      if (!isLoopbackHost(currentOrigin.hostname)) return currentOrigin.origin + uploadPath();
+      throw error;
+    }
+  }
+  function updateJoinCode() {
+    const el = document.getElementById('joinCode'), state = document.getElementById('qrState'), btn = document.getElementById('qrBtn');
+    let show = false;
+    try { show = localStorage.getItem('rocket-rally-show-qr') === '1'; } catch (_) {}
+    btn.textContent = show ? 'Hide' : 'Show';
+    const requestId = ++joinCodeRequestId;
+    el.hidden = true;
+    document.getElementById('joinCanvas').hidden = true;
+    qrCustomRow.hidden = qrSourceSelect.value !== 'custom';
+    if (show) {
+      state.textContent = 'Preparing join code…';
+      drawJoinCode(requestId);
+    } else {
+      state.textContent = 'Hidden on the display';
+    }
+  }
+  async function drawJoinCode(requestId) {
+    const canvasEl = document.getElementById('joinCanvas');
+    const el = document.getElementById('joinCode'), state = document.getElementById('qrState');
+    const custom = qrSourceSelect.value === 'custom';
+    try {
+      const url = custom ? qrCustomUrl.value.trim() : await joinUploadUrl();
+      if (requestId !== joinCodeRequestId) return;
+      if (!url) {
+        state.textContent = 'Enter a custom URL';
+        return;
+      }
+      const qr = qrcode(0, 'M'); qr.addData(url); qr.make();
+      const n = qr.getModuleCount(), cell = 5, quiet = 4;
+      canvasEl.width = canvasEl.height = (n + quiet * 2) * cell;
+      const cx = canvasEl.getContext('2d');
+      cx.fillStyle = '#fff'; cx.fillRect(0, 0, canvasEl.width, canvasEl.height);
+      cx.fillStyle = '#000';
+      for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (qr.isDark(r, c)) cx.fillRect((c + quiet) * cell, (r + quiet) * cell, cell, cell);
+      canvasEl.hidden = false;
+      el.hidden = false;
+      state.textContent = custom ? 'Showing custom URL' : 'Showing upload page link';
+    } catch (_) {
+      if (requestId !== joinCodeRequestId) return;
+      el.hidden = true;
+      state.textContent = custom ? 'Custom URL is too long for a QR code' : 'Join code unavailable — check the hub network';
+    }
+  }
+
+  // ---------- audio ----------
+  const MUSIC_TRACKS = [
+    {
+      file: 'sounds/maksymmalko-game-game-music-581017.mp3',
+      artist: 'Maksym Malko',
+      artistUrl: 'https://pixabay.com/users/maksymmalko-46459014/?utm_source=link-attribution&utm_medium=referral&utm_campaign=music&utm_content=581017'
+    },
+    {
+      file: 'sounds/the_mountain-retro-game-593063.mp3',
+      artist: 'Dmitrii Kolesnikov',
+      artistUrl: 'https://pixabay.com/users/the_mountain-3616498/?utm_source=link-attribution&utm_medium=referral&utm_campaign=music&utm_content=593063'
+    }
+  ];
+  const LAUNCH_SOUND = {
+    file: 'effects/freesound_gamestudio-gameplay-recover-hp-384936.mp3',
+    artist: 'Game Studio',
+    artistUrl: 'https://pixabay.com/users/freesound_gamestudio-49769582/?utm_source=link-attribution&utm_medium=referral&utm_campaign=music&utm_content=384936'
+  };
+  const failedMusicTracks = new Set();
+  let musicPlayer = null, launchSfx = null, launchSfxPlaying = false, currentMusicIndex = -1;
+  const musicCredit = document.getElementById('musicCredit');
+  const musicCreditArtist = document.getElementById('musicCreditArtist');
+
+  function setMusicCreditArtist(artist, url) {
+    musicCreditArtist.textContent = artist;
+    musicCreditArtist.href = url;
+  }
+  function showCurrentMusicCredit() {
+    const track = MUSIC_TRACKS[currentMusicIndex];
+    if (!soundOn || !track || !musicPlayer || musicPlayer.paused) {
+      musicCredit.hidden = true;
+      return;
+    }
+    setMusicCreditArtist(track.artist, track.artistUrl);
+    musicCredit.hidden = false;
+  }
+  function playLaunchSfx() {
+    if (!soundOn) return;
+    if (!launchSfx) {
+      launchSfx = new Audio(LAUNCH_SOUND.file);
+      launchSfx.preload = 'auto';
+      launchSfx.volume = .65;
+      launchSfx.addEventListener('playing', () => {
+        launchSfxPlaying = true;
+        setMusicCreditArtist(LAUNCH_SOUND.artist, LAUNCH_SOUND.artistUrl);
+        musicCredit.hidden = !soundOn;
+      });
+      launchSfx.addEventListener('ended', () => {
+        launchSfxPlaying = false;
+        showCurrentMusicCredit();
+      });
+    }
+    launchSfx.pause();
+    try { launchSfx.currentTime = 0; } catch (_) {}
+    launchSfx.play().catch(() => {});
+  }
+  function pickNextMusicIndex() {
+    let choices = MUSIC_TRACKS.map((_, index) => index)
+      .filter(index => !failedMusicTracks.has(index) && index !== currentMusicIndex);
+    if (!choices.length) choices = MUSIC_TRACKS.map((_, index) => index).filter(index => !failedMusicTracks.has(index));
+    return choices.length ? choices[Math.floor(Math.random() * choices.length)] : -1;
+  }
+  function playMusicTrack(index) {
+    if (!soundOn || !musicPlayer || !MUSIC_TRACKS[index]) return;
+    const track = MUSIC_TRACKS[index];
+    currentMusicIndex = index;
+    if (!launchSfxPlaying) {
+      setMusicCreditArtist(track.artist, track.artistUrl);
+      musicCredit.hidden = true;
+    }
+    musicPlayer.src = track.file;
+    musicPlayer.load();
+    musicPlayer.play().catch(() => { musicCredit.hidden = true; });
+  }
+  function startMusic() {
+    if (!MUSIC_TRACKS.length) return;
+    if (!musicPlayer) {
+      musicPlayer = new Audio();
+      musicPlayer.preload = 'none';
+      musicPlayer.volume = .3;
+      musicPlayer.addEventListener('playing', () => {
+        if (!soundOn) musicCredit.hidden = true;
+        else if (launchSfxPlaying) musicCredit.hidden = false;
+        else showCurrentMusicCredit();
+      });
+      musicPlayer.addEventListener('ended', () => {
+        if (!soundOn) return;
+        const next = repeatSong ? currentMusicIndex : pickNextMusicIndex();
+        if (next >= 0) playMusicTrack(next);
+      });
+      musicPlayer.addEventListener('error', () => {
+        if (!soundOn || currentMusicIndex < 0) return;
+        failedMusicTracks.add(currentMusicIndex);
+        const next = pickNextMusicIndex();
+        if (next >= 0) playMusicTrack(next);
+        else musicCredit.hidden = true;
+      });
+    }
+    if (currentMusicIndex >= 0 && !failedMusicTracks.has(currentMusicIndex) && musicPlayer.src) {
+      musicPlayer.play().catch(() => { musicCredit.hidden = true; });
+      return;
+    }
+    if (failedMusicTracks.size === MUSIC_TRACKS.length) failedMusicTracks.clear();
+    const next = pickNextMusicIndex();
+    if (next >= 0) playMusicTrack(next);
+  }
+  function pauseMusic() {
+    if (musicPlayer) musicPlayer.pause();
+    if (launchSfx) {
+      launchSfx.pause();
+      try { launchSfx.currentTime = 0; } catch (_) {}
+    }
+    launchSfxPlaying = false;
+    musicCredit.hidden = true;
+  }
+  // ---------- connect ----------
+  async function hydrateNetwork() {
+    try { const res = await fetch('/api/rockets'); if (!res.ok) throw new Error(); for (const record of await res.json()) await addRocket(record, false); connectionEl.textContent = 'Mission control connected'; }
+    catch (_) { connectionEl.textContent = 'Hub offline'; }
+  }
+  async function connect() {
+    if (demo) { await createDemo(); return; }
+    if (location.protocol === 'file:') {
+      for (const record of await RocketStore.all()) await addRocket(record, false);
+      connectionEl.textContent = 'Local flight mode';
+      const bc = new BroadcastChannel(ROCKET_SYNC_CHANNEL);
+      bc.onmessage = e => { const data = e.data || {}; if (data.type === 'new-rocket') addRocket(data.rocket, true); if (data.type === 'remove-rocket') removeRocket(data.id); if (data.type === 'clear') clearRockets(); };
+      return;
+    }
+    await hydrateNetwork();
+    const events = new EventSource('/api/events');
+    events.onopen = () => { connectionEl.textContent = 'Mission control connected'; };
+    events.addEventListener('new-rocket', e => addRocket(JSON.parse(e.data), true));
+    events.addEventListener('sync-rockets', async e => { for (const record of JSON.parse(e.data)) await addRocket(record, false); });
+    events.addEventListener('remove-rocket', e => removeRocket(JSON.parse(e.data).id));
+    events.addEventListener('clear', () => clearRockets());
+    events.onerror = () => connectionEl.textContent = 'Reconnecting to hub…';
+  }
+
+  // ---------- wiring ----------
+  const panel = document.getElementById('panel');
+  document.getElementById('settingsBtn').onclick = () => panel.classList.add('open');
+  document.getElementById('closePanel').onclick = () => panel.classList.remove('open');
+  const clearBtn = document.getElementById('clearBtn');
+  armConfirm(clearBtn, 'Tap again to clear', clearAll);
+  document.getElementById('exportBtn').onclick = exportFleet;
+  document.getElementById('importBtn').onclick = () => document.getElementById('importFile').click();
+  document.getElementById('importFile').onchange = e => { if (e.target.files[0]) importFleet(e.target.files[0]); e.target.value = ''; };
+  document.getElementById('soundBtn').onclick = () => {
+    soundOn = !soundOn;
+    document.getElementById('soundBtn').textContent = soundOn ? 'Mute' : 'Enable';
+    document.getElementById('soundState').textContent = soundOn ? 'Music and launch sounds enabled' : 'Muted by default';
+    if (soundOn) startMusic(); else pauseMusic();
+  };
+  const repeatSongToggle = document.getElementById('repeatSong');
+  repeatSongToggle.checked = repeatSong;
+  repeatSongToggle.onchange = () => {
+    repeatSong = repeatSongToggle.checked;
+    try { localStorage.setItem('rocket-rally-music-repeat', repeatSong ? '1' : '0'); } catch (_) {}
+  };
+  document.getElementById('qrBtn').onclick = () => {
+    let show = false; try { show = localStorage.getItem('rocket-rally-show-qr') === '1'; } catch (_) {}
+    try { localStorage.setItem('rocket-rally-show-qr', show ? '0' : '1'); } catch (_) {}
+    updateJoinCode();
+  };
+  qrSourceSelect.onchange = () => {
+    try { localStorage.setItem('rocket-rally-qr-source', qrSourceSelect.value); } catch (_) {}
+    updateJoinCode();
+  };
+  qrCustomUrl.oninput = () => {
+    try { localStorage.setItem('rocket-rally-qr-url', qrCustomUrl.value); } catch (_) {}
+    updateJoinCode();
+  };
+
+  // ---------- title / subtitle ----------
+  const DEFAULT_SUBTITLE = 'Shared starfleet';
+  const brandTitle = document.getElementById('brandTitle'), brandSub = document.getElementById('brandSub');
+  const titleInput = document.getElementById('titleInput'), subtitleInput = document.getElementById('subtitleInput');
+  try {
+    titleInput.value = localStorage.getItem('rocket-rally-title') || '';
+    subtitleInput.value = localStorage.getItem('rocket-rally-subtitle') || '';
+  } catch (_) {}
+  function applyBrandText() {
+    const title = titleInput.value.trim(), subtitle = subtitleInput.value.trim();
+    if (title) brandTitle.textContent = title;
+    else brandTitle.innerHTML = 'Rocket<br>Rally';
+    brandSub.textContent = subtitle || DEFAULT_SUBTITLE;
+    document.title = (title || 'Rocket Rally') + ' — Fleet display';
+  }
+  titleInput.oninput = () => {
+    try { localStorage.setItem('rocket-rally-title', titleInput.value); } catch (_) {}
+    applyBrandText();
+  };
+  subtitleInput.oninput = () => {
+    try { localStorage.setItem('rocket-rally-subtitle', subtitleInput.value); } catch (_) {}
+    applyBrandText();
+  };
+  applyBrandText();
+  const orbitSlider = document.getElementById('orbitSpeed'), scrambleSlider = document.getElementById('scrambleBalance');
+  orbitSlider.value = Math.round(orbitSpeedSetting * 100); scrambleSlider.value = Math.round(scrambleBalance * 100);
+  orbitSlider.oninput = () => { orbitSpeedSetting = +orbitSlider.value / 100; try { localStorage.setItem('rocket-rally-orbit-speed', orbitSlider.value); } catch (_) {} };
+  scrambleSlider.oninput = () => { scrambleBalance = +scrambleSlider.value / 100; try { localStorage.setItem('rocket-rally-scramble-balance', scrambleSlider.value); } catch (_) {} };
+  document.getElementById('resetTempoBtn').onclick = () => {
+    orbitSlider.value = DEFAULT_ORBIT_SPEED; scrambleSlider.value = DEFAULT_SCRAMBLE_BALANCE;
+    orbitSlider.oninput(); scrambleSlider.oninput();
+    showToast('Rally tempo restored to defaults');
+  };
+  const maxRocketsSlider = document.getElementById('maxRockets');
+  const rocketScaleSlider = document.getElementById('rocketScale');
+  maxRocketsSlider.value = maxRockets;
+  rocketScaleSlider.value = Math.round(rocketScale * 100);
+  document.getElementById('maxRocketsValue').textContent = maxRockets;
+  document.getElementById('rocketScaleValue').textContent = `${Math.round(rocketScale * 100)}%`;
+  maxRocketsSlider.oninput = () => {
+    maxRockets = +maxRocketsSlider.value;
+    document.getElementById('maxRocketsValue').textContent = maxRockets;
+    try { localStorage.setItem('rocket-rally-max-rockets', maxRockets); } catch (_) {}
+    updateCount();
+  };
+  rocketScaleSlider.oninput = () => {
+    rocketScale = +rocketScaleSlider.value / 100;
+    document.getElementById('rocketScaleValue').textContent = `${rocketScaleSlider.value}%`;
+    try { localStorage.setItem('rocket-rally-rocket-scale', rocketScaleSlider.value); } catch (_) {}
+  };
+
+  updateJoinCode();
+  addEventListener('resize', resize);
+  resize(); connect(); requestAnimationFrame(frame);
+})();
+</script>
+</body></html>

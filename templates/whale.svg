@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 210 297" width="210mm" height="297mm">
+  <rect width="210" height="297" fill="white"/>
+  <g fill="none" stroke="#17172b" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M105 40C70 55 55 95 60 145L28 168 55 172 48 215 70 230 38 258 80 246 105 252 130 246 172 258 140 230 162 215 155 172 182 168C150 95 140 55 105 40Z"/>
+    <path d="M60 145Q105 158 150 145M75 190Q105 198 135 190M70 205Q105 213 140 205"/>
+    <circle cx="105" cy="100" r="22"/>
+  </g>
+  <g font-family="Arial, sans-serif" text-anchor="middle" fill="#17172b"><text x="105" y="285" font-size="8" font-weight="bold">STAR WHALE</text><text x="105" y="292" font-size="4">Colour every panel, then photograph this page.</text></g>
+</svg>
